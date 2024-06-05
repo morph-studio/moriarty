@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "moriarty"
+description = "moriarty"
+keywords = ["moriarty"]
+requires-python = ">=3.10"
+dependencies = ["pydantic>=2"]
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]
+
+[[project.authors]]
+name = "wh1isper"
+email = "jizhongsheng957@gmail.com"
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.license]
+text = "BSD 3-Clause License"
+
+[project.urls]
+Source = "https://github.com/wh1isper/moriarty"
+
+[tool.check-manifest]
+ignore = [".*"]
+
+[tool.hatch.version]
+path = "moriarty/__init__.py"
