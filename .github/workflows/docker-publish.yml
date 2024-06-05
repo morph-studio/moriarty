@@ -36,7 +36,7 @@ jobs:
                   push: true
                   tags: wh1isper/moriarty:${{ github.ref_name }}
             - name: Build and push image
-              id: docker_build_publish
+              id: docker_build_publish_latest
               uses: docker/build-push-action@v5
               with:
                   context: .
