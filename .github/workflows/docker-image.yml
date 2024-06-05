@@ -28,4 +28,4 @@ jobs:
                   cache-to: type=gha,mode=max
                   file: ./docker/Dockerfile
                   push: false
-                  tags: ${{ secrets.DOCKERHUB_USERNAME }}/moriarty:latest
+                  tags: wh1isper/moriarty:latest
