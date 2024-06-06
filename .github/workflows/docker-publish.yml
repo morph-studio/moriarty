@@ -43,17 +43,28 @@ jobs:
                   platforms: linux/amd64,linux/arm64/v8
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
-                  file: ./docker/Dockerfile
+                  file: ./docker/Dockerfile.matrix
                   push: true
                   tags: wh1isper/moriarty:${{ github.ref_name }}
             - name: Build and push image
-              id: docker_build_publish_latest
+              id: docker_build_publish_matrix_latest
               uses: docker/build-push-action@v5
               with:
                   context: .
                   platforms: linux/amd64,linux/arm64/v8
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
-                  file: ./docker/Dockerfile
+                  file: ./docker/Dockerfile.matrix
+                  push: true
+                  tags: wh1isper/moriarty:latest
+            - name: Build and push image
+              id: docker_build_publish_sidecar_latest
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  platforms: linux/amd64,linux/arm64/v8
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+                  file: ./docker/Dockerfile.sidecar
                   push: true
                   tags: wh1isper/moriarty:latest

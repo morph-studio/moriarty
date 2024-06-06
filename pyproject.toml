@@ -31,7 +31,7 @@ matrix = [
     "uvicorn[standard]",
     "fastapi",
 ]
-test = ["pytest", "pytest-asyncio", "moriarty[matrix]", "docker"]
+test = ["pytest", "pytest-asyncio", "moriarty[matrix]", "docker", "pytest-cov"]
 docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]
 
 [[project.authors]]
