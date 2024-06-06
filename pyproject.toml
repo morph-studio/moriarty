@@ -7,7 +7,14 @@ name = "moriarty"
 description = "moriarty"
 keywords = ["moriarty"]
 requires-python = ">=3.10"
-dependencies = ["pydantic>=2"]
+dependencies = [
+    "pydantic>=2",
+    "brq",
+    "httpx",
+    "loguru",
+    "click",
+    "async-timeout;python_version<'3.11'",
+]
 dynamic = ["version"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -17,7 +24,14 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+metrix = [
+    "psycopg2-binary",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "uvicorn[standard]",
+    "fastapi",
+]
+test = ["pytest", "pytest-asyncio", "moriarty[metrix]", "docker"]
 docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]
 
 [[project.authors]]
