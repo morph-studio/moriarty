@@ -37,8 +37,8 @@ Key Components:
 
 CLIs:
 
-- `moriarty`: Main CLI to interact with `Metrix` service
-- `moriarty-deploy`: Request `Metrix Operator`'s API or database for deploy inference endpoint.
+- `moriarty`: Main CLI to interact with `matrix` service
+- `moriarty-deploy`: Request `matrix Operator`'s API or database for deploy inference endpoint.
 
 ## Install
 

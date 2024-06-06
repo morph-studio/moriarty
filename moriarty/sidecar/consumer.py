@@ -9,7 +9,7 @@ from brq.consumer import Consumer
 from brq.daemon import Daemon
 
 from moriarty.log import logger
-from moriarty.params import MetrixCallback
+from moriarty.params import MatrixCallback
 
 if sys.version_info >= (3, 11):
     import asyncio as async_timeout
@@ -75,14 +75,14 @@ class InferencerConsumer:
                 )
             except httpx.ConnectError as e:
                 logger.error(f"Invoke endpoint failed: {e}")
-                await self._callback(MetrixCallback.from_exception(e))
+                await self._callback(MatrixCallback.from_exception(e))
                 return None
             else:
                 logger.debug(f"Invoke endpoint response status: {response.status_code}")
-                await self._callback(MetrixCallback.from_response(response))
+                await self._callback(MatrixCallback.from_response(response))
                 return response.json()
 
-    async def _callback(self, callback_params: MetrixCallback) -> None:
+    async def _callback(self, callback_params: MatrixCallback) -> None:
         transport = httpx.HTTPTransport(
             retries=5,
         )

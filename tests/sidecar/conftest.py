@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 import docker
-from moriarty.params import MetrixCallback
+from moriarty.params import MatrixCallback
 from moriarty.sidecar.consumer import InferencerConsumer
 from moriarty.sidecar.producer import JobProducer
 

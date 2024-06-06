@@ -24,14 +24,14 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-metrix = [
+matrix = [
     "psycopg2-binary",
     "sqlalchemy[asyncio]",
     "asyncpg",
     "uvicorn[standard]",
     "fastapi",
 ]
-test = ["pytest", "pytest-asyncio", "moriarty[metrix]", "docker"]
+test = ["pytest", "pytest-asyncio", "moriarty[matrix]", "docker"]
 docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]
 
 [[project.authors]]
