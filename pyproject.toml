@@ -38,6 +38,9 @@ docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]
 name = "wh1isper"
 email = "jizhongsheng957@gmail.com"
 
+[project.scripts]
+moriarty-sidecar = "moriarty.sidecar.cli:cli"
+
 [project.readme]
 file = "README.md"
 content-type = "text/markdown"

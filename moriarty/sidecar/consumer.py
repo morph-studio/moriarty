@@ -110,8 +110,8 @@ class InferencerConsumer:
         async with httpx.AsyncClient() as client:
             while True:
                 try:
-                    logger.debug(f"Ping {self.health_check_url}")
                     await client.get(self.health_check_url, timeout=60)
+                    logger.debug(f"Ping {self.health_check_url} succeeded")
                     break
                 except httpx.ConnectError as e:
                     logger.debug(f"Ping {self.health_check_url} failed: {e}")
