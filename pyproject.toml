@@ -39,7 +39,13 @@ name = "wh1isper"
 email = "jizhongsheng957@gmail.com"
 
 [project.scripts]
+
+moriarty-init = "moriarty.init.cli:cli"
+moriarty-operator = "moriarty.matrix.operator.cli:cli"
+moriarty-connector = "moriarty.matrix.connector.cli:cli"
 moriarty-sidecar = "moriarty.sidecar.cli:cli"
+moriarty-deploy = "moriarty.deploy.cli:cli"
+
 
 [project.readme]
 file = "README.md"

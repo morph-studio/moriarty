@@ -37,6 +37,7 @@ Key Components:
 
 CLIs:
 
+- `moriarty-init`: Run init script
 - `moriarty-operator`: Start the operator component
 - `moriarty-connector`: Start the connector component
 - `moriarty-sidecar`: Start the sidecar component
