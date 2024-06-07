@@ -9,4 +9,4 @@ FROM python:3.10.12-slim-bookworm
 
 COPY --from=builder /source/dist/*.whl /tmp/
 
-RUN pip install --no-cache-dir $(echo /tmp/*.whl)[service]
+RUN pip install --no-cache-dir $(echo /tmp/*.whl)
