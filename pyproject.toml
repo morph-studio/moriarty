@@ -30,6 +30,7 @@ matrix = [
     "asyncpg",
     "uvicorn[standard]",
     "fastapi",
+    "pluggy",
 ]
 test = ["pytest", "pytest-asyncio", "moriarty[matrix]", "docker", "pytest-cov"]
 docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]
@@ -41,6 +42,7 @@ email = "jizhongsheng957@gmail.com"
 [project.scripts]
 
 moriarty-init = "moriarty.init.cli:cli"
+moriarty-matrix = "moriarty.matrix.cli:cli"
 moriarty-operator = "moriarty.matrix.operator.cli:cli"
 moriarty-connector = "moriarty.matrix.connector.cli:cli"
 moriarty-sidecar = "moriarty.sidecar.cli:cli"

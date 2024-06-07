@@ -1,20 +1,10 @@
-import asyncio
-from functools import wraps
-
 import click
 from brq.tools import get_redis_client, get_redis_url
 
 from moriarty.sidecar.consumer import InferencerConsumer
+from moriarty.tools import coro
 
 from .envs import *
-
-
-def coro(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        return asyncio.run(f(*args, **kwargs))
-
-    return wrapper
 
 
 @click.command()
