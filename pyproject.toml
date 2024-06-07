@@ -25,12 +25,19 @@ classifiers = [
 
 [project.optional-dependencies]
 matrix = [
+    "moriarty[service]",
+    "moriarty[sqs]",
+]
+
+sqs = ["boto3", "boto3-stubs[sqs]"]
+service = [
     "psycopg2-binary",
     "sqlalchemy[asyncio]",
     "asyncpg",
     "uvicorn[standard]",
     "fastapi",
     "pluggy",
+    "kubernetes",
 ]
 test = ["pytest", "pytest-asyncio", "moriarty[matrix]", "docker", "pytest-cov"]
 docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]

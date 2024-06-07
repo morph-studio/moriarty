@@ -46,7 +46,7 @@ CLIs:
 
 ## Install
 
-`pip install moriarty`
+`pip install moriarty[matrix]` for all components.
 
 Or use docker image
 
