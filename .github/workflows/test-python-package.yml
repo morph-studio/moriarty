@@ -1,10 +1,10 @@
-name: Python package
+name: Test python package
 
 on:
     push:
-        branches: ["master", "main"]
+        branches: ["main"]
     pull_request:
-        branches: ["master", "main"]
+        branches: ["main"]
 
 jobs:
     build:
@@ -27,4 +27,8 @@ jobs:
                   python -m pip install -e .[test]
             - name: Test with pytest
               run: |
-                  pytest -vv
+                  pytest -vv --cov-config=.coveragerc --cov-report term-missing --cov=moriarty/ tests
+            - name: Upload coverage reports to Codecov
+              uses: codecov/codecov-action@v4.0.1
+              with:
+                  token: ${{ secrets.CODECOV_TOKEN }}

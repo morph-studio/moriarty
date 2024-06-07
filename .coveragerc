@@ -1,0 +1,5 @@
+[run]
+omit =
+    */tests/*
+    */alembic/*
+    **/cli.py
