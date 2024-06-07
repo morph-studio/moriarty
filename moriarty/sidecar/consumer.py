@@ -9,7 +9,7 @@ from brq.consumer import Consumer
 from brq.daemon import Daemon
 
 from moriarty.log import logger
-from moriarty.params import MatrixCallback
+from moriarty.sidecar.params import MatrixCallback
 
 if sys.version_info >= (3, 11):
     import asyncio as async_timeout
@@ -30,7 +30,7 @@ class InferencerConsumer:
         invoke_path: str = "/invocations",
         health_check_url: str = "/ping",
         callbacl_url: str = "http://moriarty-operator:8081/api/callback",
-        enable_retry: bool = False,
+        enable_retry: bool = True,
         enable_ssl: bool = False,
         concurrency: int = 1,
         process_timeout: int = 600,

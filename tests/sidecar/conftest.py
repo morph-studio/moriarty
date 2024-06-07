@@ -8,8 +8,8 @@ import httpx
 import pytest
 
 import docker
-from moriarty.params import MatrixCallback
 from moriarty.sidecar.consumer import InferencerConsumer
+from moriarty.sidecar.params import MatrixCallback
 from moriarty.sidecar.producer import JobProducer
 
 _HERE = Path(__file__).parent

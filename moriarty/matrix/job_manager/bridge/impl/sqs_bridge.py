@@ -6,6 +6,9 @@ class SQSBridge(QueueBridge):
 
     def __init__(
         self,
+        result_sqs_url: str,
+        *args,
+        **kwargs,
     ):
         pass
 
