@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pluggy
 
-project_name = "moriarty-matrix-spawner"
+project_name = "moriarty.matrix.spawner"
 """
 The entry-point name of this extension.
 
@@ -49,7 +49,7 @@ def register(manager):
 
     .. code-block:: toml
 
-        [project.entry-points.moriarty-matrix-spawner]
+        [project.entry-points."moriarty.matrix.spawner"]
         {whatever-name} = "{package}.{path}.{to}.{file-with-hookimpl-function}"
 
 

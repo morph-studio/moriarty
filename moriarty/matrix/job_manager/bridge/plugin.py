@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import pluggy
 
-project_name = "moriarty-matrix-bridge"
+project_name = "moriarty.matrix.bridge"
 """
 The entry-point name of this extension.
 
-Should be used in ``pyproject.toml`` as ``[project.entry-points."{project_name}"]``
+Should be used in ``pyproject.toml`` as ``[project.entry-points."moriarty.matrix.bridge"]``
 """
 hookimpl = pluggy.HookimplMarker(project_name)
 """
@@ -49,7 +49,7 @@ def register(manager):
 
     .. code-block:: toml
 
-        [project.entry-points.moriarty-matrix-bridge]
+        [project.entry-points.moriarty.matrix.bridge]
         {whatever-name} = "{package}.{path}.{to}.{file-with-hookimpl-function}"
 
 
