@@ -13,6 +13,7 @@ dependencies = [
     "httpx",
     "loguru",
     "click",
+    "anyio",
     "async-timeout;python_version<'3.11'",
 ]
 dynamic = ["version"]

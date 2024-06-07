@@ -6,7 +6,6 @@ import inspect
 from functools import wraps
 
 import anyio
-from fastapi.concurrency import run_in_threadpool
 
 
 def coro(f):
