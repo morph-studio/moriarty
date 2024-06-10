@@ -1,10 +1,10 @@
 import os
-from uuid import uuid4
 
 os.environ["MORIARTY_LOG_LEVEL"] = "DEBUG"
 
 import socket
 import time
+from uuid import uuid4
 
 import pytest
 import redis

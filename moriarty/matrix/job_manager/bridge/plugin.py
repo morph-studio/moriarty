@@ -53,7 +53,7 @@ def register(manager):
 
     .. code-block:: toml
 
-        [project.entry-points.moriarty.matrix.bridge]
+        [project.entry-points."moriarty.matrix.bridge"]
         {whatever-name} = "{package}.{path}.{to}.{file-with-hookimpl-function}"
 
 

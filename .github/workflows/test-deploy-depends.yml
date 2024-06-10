@@ -1,4 +1,4 @@
-name: Test sidecar dependencies
+name: Test deploy cli dependencies
 
 on:
     push:

@@ -186,7 +186,7 @@ async def start(
         if v is not None
     }
 
-    async with get_redis_client(redis_url) as redis_client:
+    async with get_redis_client(redis_url, is_cluster=redis_cluster) as redis_client:
         consumer = InferencerConsumer(
             redis_client=redis_client, endpoint_name=endpoint_name, **kwargs
         )
