@@ -30,7 +30,7 @@ class InferencerConsumer:
         invoke_path: str = "/invocations",
         health_check_url: str = "/ping",
         callbacl_url: str = "http://moriarty-operator:8081/api/callback",
-        enable_retry: bool = True,
+        enable_retry: bool = False,
         enable_ssl: bool = False,
         concurrency: int = 1,
         process_timeout: int = 600,
@@ -58,7 +58,9 @@ class InferencerConsumer:
             group_name=self.GROUP_NAME,
             enable_enque_deferred_job=False,  # No deferred job for inferencer
             enable_reprocess_timeout_job=enable_retry,
+            enable_dead_queue=False,
             process_timeout=self.process_timeout,
+            delete_messgae_after_process=True,
             **kwargs,
         )
         self.daemon = Daemon(*[self._consumer_builder() for _ in range(concurrency)])
