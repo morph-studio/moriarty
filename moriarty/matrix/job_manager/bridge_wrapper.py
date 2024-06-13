@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from fastapi import Depends
 
@@ -12,13 +12,13 @@ def get_bridge_manager():
     return BridgeManager()
 
 
-def get_job_manager(
+def get_bridge_wrapper(
     bridge_manager: BridgeManager = Depends(get_bridge_manager),
 ):
-    return JobManager(bridge_manager)
+    return BridgeWrapper(bridge_manager)
 
 
-class JobManager:
+class BridgeWrapper:
     def __init__(
         self,
         bridge_manager: BridgeManager,
@@ -33,56 +33,84 @@ class JobManager:
     async def enqueue_job(
         self,
         bridge: str | QueueBridge,
+        bridge_job_queue_url: str,
         job: InferenceJob,
         *bridge_args,
         **bridge_kwargs,
     ) -> str:
         if isinstance(bridge, str):
-            bridge = self.get_bridge(bridge, *bridge_args, **bridge_kwargs)
+            bridge = self.get_bridge(
+                bridge,
+                bridge_job_queue_url=bridge_job_queue_url,
+                *bridge_args,
+                **bridge_kwargs,
+            )
         await bridge.enqueue_job(
             job,
         )
         return job.job_id
 
-    async def pool_job(
+    async def dequeue_job(
         self,
         bridge: str | QueueBridge,
-        process_func: callable,
+        bridge_job_queue_url: str,
+        process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
+        size: int = None,
         *bridge_args,
         **bridge_kwargs,
-    ) -> InferenceJob:
+    ) -> int:
         if isinstance(bridge, str):
-            bridge = self.get_bridge(bridge, *bridge_args, **bridge_kwargs)
+            bridge = self.get_bridge(
+                bridge,
+                bridge_job_queue_url=bridge_job_queue_url,
+                *bridge_args,
+                **bridge_kwargs,
+            )
         process_func = ensure_awaitable(process_func)
 
         return await bridge.dequeue_job(
             process_func,
+            size=size,
         )
 
     async def enqueue_result(
         self,
         bridge: str | QueueBridge,
+        bridge_result_queue_url: str,
         result: InferenceResult,
         *bridge_args,
         **bridge_kwargs,
     ) -> str:
         if isinstance(bridge, str):
-            bridge = self.get_bridge(bridge, *bridge_args, **bridge_kwargs)
+            bridge = self.get_bridge(
+                bridge,
+                bridge_result_queue_url=bridge_result_queue_url,
+                *bridge_args,
+                **bridge_kwargs,
+            )
         await bridge.enqueue_result(
             result,
         )
         return result.job_id
 
-    async def pool_result(
+    async def dequeue_result(
         self,
         bridge: str | QueueBridge,
-        process_func: callable,
+        bridge_result_queue_url: str,
+        process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
+        size: int = None,
         *bridge_args,
         **bridge_kwargs,
     ) -> InferenceResult:
         if isinstance(bridge, str):
-            bridge = self.get_bridge(bridge, *bridge_args, **bridge_kwargs)
+            bridge = self.get_bridge(
+                bridge,
+                bridge_result_queue_url=bridge_result_queue_url,
+                *bridge_args,
+                **bridge_kwargs,
+            )
         process_func = ensure_awaitable(process_func)
         return await bridge.dequeue_result(
             process_func,
+            size=size,
         )

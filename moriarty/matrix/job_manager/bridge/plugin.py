@@ -73,17 +73,26 @@ class QueueBridge:
 
     register_name: str
 
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(
+        self,
+        bridge_job_queue_url: str = None,
+        bridge_result_queue_url: str = None,
+        *args,
+        **kwargs,
+    ):
+        self.bridge_job_queue_url = bridge_job_queue_url
+        self.bridge_result_queue_url = bridge_result_queue_url
 
     async def enqueue_job(self, job: InferenceJob) -> str:
         raise NotImplementedError
 
-    async def dequeue_job(self, process_func: Awaitable[InferenceJob]) -> InferenceJob:
+    async def dequeue_job(self, process_func: Awaitable[InferenceJob], size: int = None) -> int:
         raise NotImplementedError
 
     async def enqueue_result(self, result: InferenceResult) -> str:
         raise NotImplementedError
 
-    async def dequeue_result(self, process_func: Awaitable[InferenceResult]) -> InferenceResult:
+    async def dequeue_result(
+        self, process_func: Awaitable[InferenceResult], size: int = None
+    ) -> list[InferenceResult]:
         raise NotImplementedError
