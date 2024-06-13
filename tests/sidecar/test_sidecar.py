@@ -12,7 +12,7 @@ async def send_stop_sig(pid, wait=2):
 async def test_sidecar(async_redis_client, endpoint_name, inference_consumer):
     producer = JobProducer(redis_client=async_redis_client)
 
-    invoke_params = {"hello": "world"}
+    invoke_params = {"inference_id": "hello world"}
     pid = os.getpid()
     asyncio.create_task(send_stop_sig(pid))
     await producer.invoke(endpoint_name, invoke_params)
