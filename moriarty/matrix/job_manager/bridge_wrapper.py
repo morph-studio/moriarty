@@ -33,7 +33,7 @@ class BridgeWrapper:
     async def enqueue_job(
         self,
         bridge: str | QueueBridge,
-        bridge_job_queue_url: str,
+        endpoint_name: str,
         job: InferenceJob,
         *bridge_args,
         **bridge_kwargs,
@@ -41,19 +41,19 @@ class BridgeWrapper:
         if isinstance(bridge, str):
             bridge = self.get_bridge(
                 bridge,
-                bridge_job_queue_url=bridge_job_queue_url,
                 *bridge_args,
                 **bridge_kwargs,
             )
         await bridge.enqueue_job(
             job,
+            endpoint_name=endpoint_name,
         )
         return job.job_id
 
     async def dequeue_job(
         self,
         bridge: str | QueueBridge,
-        bridge_job_queue_url: str,
+        endpoint_name: str,
         process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
         size: int = None,
         *bridge_args,
@@ -62,7 +62,6 @@ class BridgeWrapper:
         if isinstance(bridge, str):
             bridge = self.get_bridge(
                 bridge,
-                bridge_job_queue_url=bridge_job_queue_url,
                 *bridge_args,
                 **bridge_kwargs,
             )
@@ -70,6 +69,7 @@ class BridgeWrapper:
 
         return await bridge.dequeue_job(
             process_func,
+            endpoint_name=endpoint_name,
             size=size,
         )
 
@@ -114,3 +114,19 @@ class BridgeWrapper:
             process_func,
             size=size,
         )
+
+    async def prune_endpoint(
+        self,
+        endpoint_name: str,
+        bridge: str | QueueBridge,
+        *bridge_args,
+        **bridge_kwargs,
+    ):
+        if isinstance(bridge, str):
+            bridge = self.get_bridge(
+                bridge,
+                *bridge_args,
+                **bridge_kwargs,
+            )
+        f = ensure_awaitable(bridge.remove_job_queue)
+        await f(endpoint_name)

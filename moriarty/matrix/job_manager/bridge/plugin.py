@@ -75,13 +75,17 @@ class QueueBridge:
 
     def __init__(
         self,
-        bridge_job_queue_url: str = None,
         bridge_result_queue_url: str = None,
         *args,
         **kwargs,
     ):
-        self.bridge_job_queue_url = bridge_job_queue_url
         self.bridge_result_queue_url = bridge_result_queue_url
+
+    def make_job_queue_url(self, endpoint_name: str) -> str:
+        raise NotImplementedError
+
+    def remove_job_queue(self, endpoint_name: str) -> None:
+        raise NotImplementedError
 
     async def enqueue_job(self, job: InferenceJob) -> str:
         raise NotImplementedError

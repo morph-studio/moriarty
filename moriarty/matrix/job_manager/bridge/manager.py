@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+try:
+    from functools import cache
+except ImportError:
+    from functools import lru_cache as cache
+
 import glob
 import importlib
 from os.path import basename, dirname, isfile, join
@@ -81,6 +86,7 @@ class BridgeManager(metaclass=Singleton):
             return
         self._registed_cls[cls_name] = cls
 
+    @cache
     def init(self, c, *args, **kwargs: dict[str, Any]):
         """
         Init a new subclass of plugin.QueueBridge.

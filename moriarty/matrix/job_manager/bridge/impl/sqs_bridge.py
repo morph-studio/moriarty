@@ -1,11 +1,19 @@
+from __future__ import annotations
+
 import asyncio
 from typing import Awaitable
+
+try:
+    from functools import cache
+except ImportError:
+    from functools import lru_cache as cache
 
 from fastapi.concurrency import run_in_threadpool
 
 from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge.plugin import QueueBridge, hookimpl
 from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
+from moriarty.utils import Singleton
 
 
 class SQSBridge(QueueBridge):
@@ -30,20 +38,43 @@ class SQSBridge(QueueBridge):
             )
         return boto3.client("sqs")
 
-    async def enqueue_job(self, job: InferenceJob) -> str:
+    def make_queue_name(self, endpoint_name: str) -> str:
+        return f"moriarty-job-{endpoint_name}"
+
+    @cache
+    def make_job_queue_url(self, endpoint_name: str) -> str:
+        queue_name = self.make_queue_name(endpoint_name)
+        try:
+            return self.client.get_queue_url(QueueName=queue_name)["QueueUrl"]
+        except self.client.exceptions.QueueDoesNotExist:
+            logger.info(f"Create queue: {queue_name} as it does not exist")
+            response = self.client.create_queue(QueueName=queue_name)
+            return response["QueueUrl"]
+
+    def remove_job_queue(self, endpoint_name: str) -> None:
+        queue_name = self.make_queue_name(endpoint_name)
+        self.client.delete_queue(QueueUrl=queue_name)
+        logger.info(f"Queue {queue_name} removed")
+
+    async def enqueue_job(self, endpoint_name: str, job: InferenceJob) -> str:
         await run_in_threadpool(
             self.client.send_message,
-            QueueUrl=self.bridge_job_queue_url,
+            QueueUrl=self.make_job_queue_url(endpoint_name),
             MessageBody=job.model_dump_json(),
         )
         return job.job_id
 
-    async def dequeue_job(self, process_func: Awaitable[InferenceJob], size: int = 1) -> int:
-        return await self._poll_and_execute(process_func, self.bridge_job_queue_url, size)
+    async def dequeue_job(
+        self,
+        endpoint_name: str,
+        process_func: Awaitable[InferenceJob],
+        size: int = 1,
+    ) -> int:
+        url = self.make_job_queue_url(endpoint_name)
+        return await self._poll_and_execute(process_func, url, size)
 
     async def enqueue_result(self, result: InferenceResult) -> str:
         # TODO: Use sagemaker style response
-
         await run_in_threadpool(
             self.client.send_message,
             QueueUrl=self.bridge_result_queue_url,
