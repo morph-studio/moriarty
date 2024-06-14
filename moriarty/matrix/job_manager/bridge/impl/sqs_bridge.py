@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 from typing import Awaitable
+
+from moriarty.sidecar.params import InferenceProxyStatus
 
 try:
     from functools import cache
@@ -12,7 +16,11 @@ from fastapi.concurrency import run_in_threadpool
 
 from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge.plugin import QueueBridge, hookimpl
-from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
+from moriarty.matrix.job_manager.params import (
+    InferenceJob,
+    InferenceResult,
+    InferenceResultStatus,
+)
 from moriarty.utils import Singleton
 
 
@@ -62,7 +70,7 @@ class SQSBridge(QueueBridge):
             QueueUrl=self.make_job_queue_url(endpoint_name),
             MessageBody=job.model_dump_json(),
         )
-        return job.job_id
+        return job.inference_id
 
     async def dequeue_job(
         self,
@@ -71,32 +79,56 @@ class SQSBridge(QueueBridge):
         size: int = 1,
     ) -> int:
         url = self.make_job_queue_url(endpoint_name)
-        return await self._poll_and_execute(process_func, url, size)
+        return await self._poll_job_and_execute(process_func, url, size)
 
     async def enqueue_result(self, result: InferenceResult) -> str:
-        # TODO: Use sagemaker style response
+        invocation_status = (
+            "Completed" if result.status == InferenceResultStatus.COMPLETED else "Failed"
+        )
+        response_body = (
+            {
+                "content": base64.b64encode(json.dumps(result.payload).encode()).decode(),
+                "message": result.messages,
+                "encoding": "BASE64",
+            }
+            if result.status == InferenceResultStatus.COMPLETED
+            else {
+                "content": result.payload,
+                "message": result.messages,
+            }
+        )
+
+        message = {
+            "Message": {
+                "invocationStatus": invocation_status,
+                "eventName": "InferenceResult",
+                "responseBody": response_body,
+                "inferenceId": result.inference_id,
+                "eventName": "InferenceResult",
+            }
+        }
+
         await run_in_threadpool(
             self.client.send_message,
             QueueUrl=self.bridge_result_queue_url,
-            MessageBody=result.model_dump_json(),
+            MessageBody=json.dumps(message),
         )
-        return result.job_id
+        return result.inference_id
 
-    async def dequeue_result(self, process_func: Awaitable[InferenceJob], size: int = 10) -> int:
-        # TODO: Use sagemaker style response
-        return await self._poll_and_execute(process_func, self.bridge_result_queue_url, size)
+    async def dequeue_result(self, process_func: Awaitable[InferenceResult], size: int = 10) -> int:
+        return await self._poll_result_and_execute(process_func, self.bridge_result_queue_url, size)
 
-    async def _poll_and_execute(self, process_func: Awaitable[InferenceJob], url, size) -> int:
+    async def _poll_job_and_execute(self, process_func: Awaitable[InferenceJob], url, size) -> int:
         if size and size > 10:
             messages = []
             while len(messages) < size:
                 messages_len_before = len(messages)
-                messages.extend(self._poll_message(url, 10))
+                messages.extend(await self._poll_message(url, 10))
                 if len(messages) == messages_len_before:
                     # No message left
                     break
         else:
-            messages = self._poll_message(url, size)
+            messages = await self._poll_job_message(url, size)
 
         await asyncio.gather(
             *[
@@ -106,10 +138,11 @@ class SQSBridge(QueueBridge):
         )
         return len(messages)
 
-    def _poll_message(self, url, size: int = None) -> list[tuple[InferenceJob, str]]:
+    async def _poll_job_message(self, url, size: int = None) -> list[tuple[InferenceJob, str]]:
         size = size or 1
         valid_messages = []
-        response = self.client.receive_message(
+        response = await run_in_threadpool(
+            self.client.receive_message,
             QueueUrl=url,
             MaxNumberOfMessages=size,
             WaitTimeSeconds=self.poll_time,
@@ -129,9 +162,81 @@ class SQSBridge(QueueBridge):
                 valid_messages.append((message, receipt_handle))
         return valid_messages
 
+    async def _poll_result_and_execute(
+        self, process_func: Awaitable[InferenceResult], url, size
+    ) -> int:
+        if size and size > 10:
+            messages = []
+            while len(messages) < size:
+                messages_len_before = len(messages)
+                messages.extend(await self._poll_message(url, 10))
+                if len(messages) == messages_len_before:
+                    # No message left
+                    break
+        else:
+            messages = await self._poll_result_message(url, size)
+
+        for result, receipt_handle in messages:
+            await self._wrap_process_func(process_func, result, receipt_handle)
+        return len(messages)
+
+    async def _poll_result_message(
+        self, url, size: int = None
+    ) -> list[tuple[InferenceResult, str]]:
+        size = size or 1
+        valid_messages = []
+        response = await run_in_threadpool(
+            self.client.receive_message,
+            QueueUrl=url,
+            MaxNumberOfMessages=size,
+            WaitTimeSeconds=self.poll_time,
+        )
+        if "Messages" not in response:
+            return valid_messages
+
+        for message in response["Messages"]:
+            receipt_handle = message["ReceiptHandle"]
+            try:
+                message_body = json.loads(message["Body"])
+                message = json.loads(message_body["Message"])
+            except Exception as e:
+                continue
+            if "eventName" in message and message["eventName"] != "InferenceResult":
+                continue
+            if "invocationStatus" in message and message["invocationStatus"] == "Failed":
+                valid_messages.append(
+                    (
+                        InferenceResult(
+                            inference_id=message["inferenceId"],
+                            status=InferenceResultStatus.FAILED,
+                            message=message["responseBody"]["message"],
+                            payload=message["responseBody"]["content"],
+                        ),
+                        receipt_handle,
+                    )
+                )
+                continue
+            try:
+                inference_result = InferenceResult.model_validate_json(
+                    base64.b64decode(message["responseBody"]["content"]).decode("utf-8")
+                )
+                valid_messages.append(
+                    (
+                        inference_result,
+                        receipt_handle,
+                    )
+                )
+                continue
+            except Exception as e:
+                logger.error(f"Cannot parse inference result {message}.")
+                logger.exception(e)
+                continue
+
+        return valid_messages
+
     async def _wrap_process_func(
         self,
-        process_func: Awaitable[InferenceJob],
+        process_func: Awaitable[InferenceJob] | Awaitable[InferenceResult],
         job: InferenceJob,
         url: str,
         receipt_handle: str,
@@ -139,7 +244,7 @@ class SQSBridge(QueueBridge):
         try:
             await process_func(job)
         except Exception as e:
-            logger.error(f"Error processing job {job.job_id}: {e}")
+            logger.error(f"Error processing job {job.inference_id}: {e}")
             logger.exception(e)
             raise
         else:
