@@ -5,8 +5,6 @@ import base64
 import json
 from typing import Awaitable
 
-from moriarty.sidecar.params import InferenceProxyStatus
-
 try:
     from functools import cache
 except ImportError:
@@ -21,19 +19,29 @@ from moriarty.matrix.job_manager.params import (
     InferenceResult,
     InferenceResultStatus,
 )
-from moriarty.utils import Singleton
 
 
 class SQSBridge(QueueBridge):
+    """
+    Bridge to SQS. Compatible with AWS SageMaker AsyncInference.
+
+    Will create SQS queue for each endpoint.
+
+    Args:
+        bridge_result_queue_url: AWS SQS URL for result queue
+        poll_time: polling time in seconds
+    """
+
     register_name = "sqs"
 
     def __init__(
         self,
+        bridge_result_queue_url: str = None,
         poll_time: int = 1,
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(bridge_result_queue_url, *args, **kwargs)
         self.poll_time = poll_time
 
     @property
