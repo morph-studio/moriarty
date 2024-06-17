@@ -1,0 +1,93 @@
+import pytest
+
+from moriarty.matrix.job_manager.bridge.impl.sqs_bridge import SQSBridge
+from moriarty.matrix.job_manager.params import (
+    InferenceJob,
+    InferenceResult,
+    InferenceResultStatus,
+)
+
+
+@pytest.fixture
+def sqs_bridge(case_id):
+    try:
+        import boto3
+
+        sqs = boto3.client("sqs")
+    except ImportError:
+        pytest.skip("boto3 is not installed")
+    except Exception:
+        pytest.skip("boto3 is not configured")
+
+    job_queue_name = f"moriarty-bridge-job-test-{case_id}"
+    result_queue_name = f"moriarty-bridge-result-test-{case_id}"
+    try:
+        job_queue_url = sqs.create_queue(QueueName=job_queue_name)["QueueUrl"]
+        result_queue_url = sqs.create_queue(QueueName=result_queue_name)["QueueUrl"]
+    except sqs.exceptions.QueueAlreadyExists:
+        pass
+    except Exception:
+        pytest.skip("boto3 is not configured")
+
+    bridge = SQSBridge(
+        bridge_result_queue_url=result_queue_url,
+    )
+    bridge.make_job_queue_url = lambda _: job_queue_url
+    yield bridge
+    try:
+        sqs.delete_queue(QueueUrl=job_queue_url)
+        sqs.delete_queue(QueueUrl=result_queue_url)
+    except sqs.exceptions.QueueDoesNotExist:
+        pass
+
+
+async def test_bridge_job(sqs_bridge: SQSBridge):
+    _called = False
+    input_job = InferenceJob(
+        inference_id="test",
+        payload={"input": "test"},
+    )
+    job = await sqs_bridge.enqueue_job("test", job=input_job)
+
+    assert job
+
+    async def _process_func(job: InferenceJob):
+        nonlocal _called
+        _called = True
+        assert job == input_job
+
+    await sqs_bridge.dequeue_job("test", _process_func)
+
+    assert _called
+
+
+@pytest.mark.parametrize(
+    "inference_result",
+    [
+        InferenceResult(
+            inference_id="test",
+            status=InferenceResultStatus.COMPLETED,
+            message="Oh yeah",
+            payload={"output": "test"},
+        ),
+        InferenceResult(
+            inference_id="test",
+            status=InferenceResultStatus.FAILED,
+            message="Oh no",
+            payload={"error": "test"},
+        ),
+    ],
+)
+async def test_bridge_result(sqs_bridge: SQSBridge, inference_result: InferenceResult):
+    _called = False
+
+    await sqs_bridge.enqueue_result(inference_result)
+
+    async def _process_func(result: InferenceResult):
+        nonlocal _called
+        _called = True
+        assert result == inference_result
+
+    await sqs_bridge.dequeue_result(_process_func)
+
+    assert _called

@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+try:
+    from functools import cache
+except ImportError:
+    from functools import lru_cache as cache
+
 import glob
 import importlib
 from os.path import basename, dirname, isfile, join
@@ -72,13 +77,16 @@ class BridgeManager(metaclass=Singleton):
         cls_name = self._normalize_name(cls.register_name)
         logger.debug(f"Register for new model: {cls_name}")
         if cls in self._registed_cls.values():
-            logger.error(f"SKIP: {cls_name} is already registed")
+            logger.warning(
+                f"SKIP: trying to register {cls} as '{cls_name}', but {cls_name} is already registed."
+            )
             return
         if not issubclass(cls, plugin.QueueBridge):
             logger.error(f"SKIP: {cls_name} is not a subclass of {plugin.QueueBridge}")
             return
         self._registed_cls[cls_name] = cls
 
+    @cache
     def init(self, c, *args, **kwargs: dict[str, Any]):
         """
         Init a new subclass of plugin.QueueBridge.

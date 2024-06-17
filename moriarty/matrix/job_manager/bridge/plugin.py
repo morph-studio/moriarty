@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from typing import Awaitable
+
 import pluggy
+
+from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
 
 project_name = "moriarty.matrix.bridge"
 """
@@ -49,7 +53,7 @@ def register(manager):
 
     .. code-block:: toml
 
-        [project.entry-points.moriarty.matrix.bridge]
+        [project.entry-points."moriarty.matrix.bridge"]
         {whatever-name} = "{package}.{path}.{to}.{file-with-hookimpl-function}"
 
 
@@ -58,4 +62,41 @@ def register(manager):
 
 
 class QueueBridge:
+    """
+    A bridge is used to adapt different queue system to job manager
+
+    Implementation of subclass should follow:
+        - When dequeue a job or result, `process_func` will be called.
+          And if exception occurs, the job may not be removed from queue.
+          So that we can retry later.
+    """
+
     register_name: str
+
+    def __init__(
+        self,
+        bridge_result_queue_url: str = None,
+        *args,
+        **kwargs,
+    ):
+        self.bridge_result_queue_url = bridge_result_queue_url
+
+    def make_job_queue_url(self, endpoint_name: str) -> str:
+        raise NotImplementedError
+
+    def remove_job_queue(self, endpoint_name: str) -> None:
+        raise NotImplementedError
+
+    async def enqueue_job(self, job: InferenceJob) -> str:
+        raise NotImplementedError
+
+    async def dequeue_job(self, process_func: Awaitable[InferenceJob], size: int = None) -> int:
+        raise NotImplementedError
+
+    async def enqueue_result(self, result: InferenceResult) -> str:
+        raise NotImplementedError
+
+    async def dequeue_result(
+        self, process_func: Awaitable[InferenceResult], size: int = None
+    ) -> list[InferenceResult]:
+        raise NotImplementedError

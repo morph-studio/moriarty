@@ -1,8 +1,285 @@
+from __future__ import annotations
+
+import asyncio
+import base64
+import json
+from typing import Awaitable
+
+try:
+    from functools import cache
+except ImportError:
+    from functools import lru_cache as cache
+
+from fastapi.concurrency import run_in_threadpool
+
+from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge.plugin import QueueBridge, hookimpl
+from moriarty.matrix.job_manager.params import (
+    InferenceJob,
+    InferenceResult,
+    InferenceResultStatus,
+)
 
 
 class SQSBridge(QueueBridge):
+    """
+    Bridge to SQS. Compatible with AWS SageMaker AsyncInference.
+
+    Will create SQS queue for each endpoint.
+
+    Args:
+        bridge_result_queue_url: AWS SQS URL for result queue
+        poll_time: polling time in seconds
+    """
+
     register_name = "sqs"
+
+    def __init__(
+        self,
+        bridge_result_queue_url: str = None,
+        poll_time: int = 1,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(bridge_result_queue_url, *args, **kwargs)
+        self.poll_time = poll_time
+
+    @property
+    def client(self):
+        try:
+            import boto3
+        except ImportError:
+            raise RuntimeError(
+                "boto3 is not installed, try install moriarty with `pip install moriarty[matrix]` for all components or `pip install moriarty[sqs]` for sqs only"
+            )
+        return boto3.client("sqs")
+
+    def make_queue_name(self, endpoint_name: str) -> str:
+        return f"moriarty-job-{endpoint_name}"
+
+    @cache
+    def make_job_queue_url(self, endpoint_name: str) -> str:
+        queue_name = self.make_queue_name(endpoint_name)
+        try:
+            return self.client.get_queue_url(QueueName=queue_name)["QueueUrl"]
+        except self.client.exceptions.QueueDoesNotExist:
+            logger.info(f"Create queue: {queue_name} as it does not exist")
+            response = self.client.create_queue(QueueName=queue_name)
+            return response["QueueUrl"]
+
+    def remove_job_queue(self, endpoint_name: str) -> None:
+        queue_name = self.make_queue_name(endpoint_name)
+        self.client.delete_queue(QueueUrl=queue_name)
+        logger.info(f"Queue {queue_name} removed")
+
+    async def enqueue_job(self, endpoint_name: str, job: InferenceJob) -> str:
+        await run_in_threadpool(
+            self.client.send_message,
+            QueueUrl=self.make_job_queue_url(endpoint_name),
+            MessageBody=job.model_dump_json(),
+        )
+        logger.debug(f"Job {job.inference_id} enqueued")
+        return job.inference_id
+
+    async def dequeue_job(
+        self,
+        endpoint_name: str,
+        process_func: Awaitable[InferenceJob],
+        size: int = 1,
+    ) -> int:
+        url = self.make_job_queue_url(endpoint_name)
+        logger.debug(f"Polling job from queue: {url}")
+        return await self._poll_job_and_execute(process_func, url, size)
+
+    async def enqueue_result(self, result: InferenceResult) -> str:
+        invocation_status = (
+            "Completed" if result.status == InferenceResultStatus.COMPLETED else "Failed"
+        )
+        response_body = (
+            {
+                "content": base64.b64encode(json.dumps(result.payload).encode()).decode(),
+                "message": result.message,
+                "encoding": "BASE64",
+            }
+            if result.status == InferenceResultStatus.COMPLETED
+            else {
+                "content": result.payload,
+                "message": result.message,
+            }
+        )
+
+        message = {
+            "Message": json.dumps(
+                {
+                    "invocationStatus": invocation_status,
+                    "eventName": "InferenceResult",
+                    "responseBody": response_body,
+                    "inferenceId": result.inference_id,
+                    "eventName": "InferenceResult",
+                }
+            )
+        }
+
+        await run_in_threadpool(
+            self.client.send_message,
+            QueueUrl=self.bridge_result_queue_url,
+            MessageBody=json.dumps(message),
+        )
+        logger.debug(f"Result {result.inference_id} enqueued")
+        return result.inference_id
+
+    async def dequeue_result(self, process_func: Awaitable[InferenceResult], size: int = 10) -> int:
+        logger.debug(f"Polling result from queue: {self.bridge_result_queue_url}")
+        return await self._poll_result_and_execute(process_func, self.bridge_result_queue_url, size)
+
+    async def _poll_job_and_execute(self, process_func: Awaitable[InferenceJob], url, size) -> int:
+        if size and size > 10:
+            messages = []
+            while len(messages) < size:
+                messages_len_before = len(messages)
+                messages.extend(await self._poll_message(url, 10))
+                if len(messages) == messages_len_before:
+                    # No message left
+                    break
+        else:
+            messages = await self._poll_job_message(url, size)
+
+        await asyncio.gather(
+            *[
+                self._wrap_process_func(process_func, job, url, receipt_handle)
+                for job, receipt_handle in messages
+            ]
+        )
+        return len(messages)
+
+    async def _poll_job_message(self, url, size: int = None) -> list[tuple[InferenceJob, str]]:
+        size = size or 1
+        valid_messages = []
+        response = await run_in_threadpool(
+            self.client.receive_message,
+            QueueUrl=url,
+            MaxNumberOfMessages=size,
+            WaitTimeSeconds=self.poll_time,
+        )
+        if "Messages" not in response:
+            return valid_messages
+
+        for message in response["Messages"]:
+            receipt_handle = message["ReceiptHandle"]
+            try:
+                body = message["Body"]
+                message = InferenceJob.model_validate_json(body)
+            except Exception as e:
+                logger.error(f"Error parsing message {body}: {e}")
+                logger.exception(e)
+            else:
+                valid_messages.append((message, receipt_handle))
+        return valid_messages
+
+    async def _poll_result_and_execute(
+        self, process_func: Awaitable[InferenceResult], url, size
+    ) -> int:
+        if size and size > 10:
+            messages = []
+            while len(messages) < size:
+                messages_len_before = len(messages)
+                messages.extend(await self._poll_message(url, 10))
+                if len(messages) == messages_len_before:
+                    # No message left
+                    break
+        else:
+            messages = await self._poll_result_message(url, size)
+
+        logger.debug(f"Got {len(messages)} messages")
+        for result, receipt_handle in messages:
+            await self._wrap_process_func(
+                process_func, result, self.bridge_result_queue_url, receipt_handle
+            )
+        return len(messages)
+
+    async def _poll_result_message(
+        self, url, size: int = None
+    ) -> list[tuple[InferenceResult, str]]:
+        size = size or 1
+        valid_messages = []
+        response = await run_in_threadpool(
+            self.client.receive_message,
+            QueueUrl=url,
+            MaxNumberOfMessages=size,
+            WaitTimeSeconds=self.poll_time,
+        )
+        if "Messages" not in response:
+            return valid_messages
+
+        for message in response["Messages"]:
+            receipt_handle = message["ReceiptHandle"]
+            try:
+                message_body = json.loads(message["Body"])
+                message = json.loads(message_body["Message"])
+            except Exception as e:
+                logger.error(f"Error parsing message {message}: {e}")
+                logger.exception(e)
+                continue
+            if "eventName" in message and message["eventName"] != "InferenceResult":
+                logger.warning(f"Unexpected message {message}. Message will be ignored.")
+                continue
+            if "invocationStatus" in message and message["invocationStatus"] == "Failed":
+                logger.debug(f"Result {message['inferenceId']} failed")
+                valid_messages.append(
+                    (
+                        InferenceResult(
+                            inference_id=message["inferenceId"],
+                            status=InferenceResultStatus.FAILED,
+                            message=message["responseBody"]["message"],
+                            payload=message["responseBody"]["content"],
+                        ),
+                        receipt_handle,
+                    )
+                )
+                continue
+            try:
+                logger.debug(f"Result {message['inferenceId']} completed")
+                inference_result = InferenceResult(
+                    inference_id=message["inferenceId"],
+                    status=InferenceResultStatus.COMPLETED,
+                    message=message["responseBody"]["message"],
+                    payload=json.loads(
+                        base64.b64decode(message["responseBody"]["content"]).decode("utf-8")
+                    ),
+                )
+                valid_messages.append(
+                    (
+                        inference_result,
+                        receipt_handle,
+                    )
+                )
+                continue
+            except Exception as e:
+                logger.error(f"Cannot parse inference result {message}.")
+                logger.exception(e)
+                continue
+
+        return valid_messages
+
+    async def _wrap_process_func(
+        self,
+        process_func: Awaitable[InferenceJob] | Awaitable[InferenceResult],
+        job: InferenceJob,
+        url: str,
+        receipt_handle: str,
+    ):
+        try:
+            await process_func(job)
+        except Exception as e:
+            logger.error(f"Error processing job {job.inference_id}: {e}")
+            logger.exception(e)
+            raise
+        else:
+            await run_in_threadpool(
+                self.client.delete_message,
+                QueueUrl=url,
+                ReceiptHandle=receipt_handle,
+            )
 
 
 @hookimpl

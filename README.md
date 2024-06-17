@@ -4,6 +4,7 @@
 ![](https://img.shields.io/pypi/dm/moriarty)
 ![](https://img.shields.io/github/last-commit/wh1isper/moriarty)
 ![](https://img.shields.io/pypi/pyversions/moriarty)
+[![codecov](https://codecov.io/gh/Wh1isper/moriarty/graph/badge.svg?token=NKHSM0W8L5)](https://codecov.io/gh/Wh1isper/moriarty)
 
 # moriarty
 
@@ -46,7 +47,7 @@ CLIs:
 
 ## Install
 
-`pip install moriarty`
+`pip install moriarty[matrix]` for all components.
 
 Or use docker image
 

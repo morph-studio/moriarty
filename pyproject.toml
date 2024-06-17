@@ -13,6 +13,7 @@ dependencies = [
     "httpx",
     "loguru",
     "click",
+    "anyio",
     "async-timeout;python_version<'3.11'",
 ]
 dynamic = ["version"]
@@ -24,15 +25,26 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-matrix = [
+matrix = ["moriarty[service]", "moriarty[sqs]"]
+
+sqs = ["boto3"]
+service = [
     "psycopg2-binary",
     "sqlalchemy[asyncio]",
     "asyncpg",
     "uvicorn[standard]",
     "fastapi",
     "pluggy",
+    "kubernetes_asyncio",
 ]
-test = ["pytest", "pytest-asyncio", "moriarty[matrix]", "docker", "pytest-cov"]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "moriarty[matrix]",
+    "docker",
+    "pytest-cov",
+    "boto3-stubs[sqs]",
+]
 docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]
 
 [[project.authors]]

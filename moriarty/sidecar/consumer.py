@@ -9,7 +9,7 @@ from brq.consumer import Consumer
 from brq.daemon import Daemon
 
 from moriarty.log import logger
-from moriarty.params import MatrixCallback
+from moriarty.sidecar.params import InferenceProxyStatus, MatrixCallback
 
 if sys.version_info >= (3, 11):
     import asyncio as async_timeout
@@ -58,12 +58,17 @@ class InferencerConsumer:
             group_name=self.GROUP_NAME,
             enable_enque_deferred_job=False,  # No deferred job for inferencer
             enable_reprocess_timeout_job=enable_retry,
+            enable_dead_queue=False,
             process_timeout=self.process_timeout,
+            delete_messgae_after_process=True,
             **kwargs,
         )
         self.daemon = Daemon(*[self._consumer_builder() for _ in range(concurrency)])
 
     async def _proxy(self, payload: dict) -> dict | None:
+        inference_id = payload.get("inference_id") or payload.get("inferenceId")
+        if not inference_id:
+            return await self.raise_no_inference_id_error(payload)
         async with httpx.AsyncClient() as client:
             logger.debug(f"Invoke endpoint: {self.invoke_url}")
             try:
@@ -75,12 +80,21 @@ class InferencerConsumer:
                 )
             except httpx.ConnectError as e:
                 logger.error(f"Invoke endpoint failed: {e}")
-                await self._callback(MatrixCallback.from_exception(e))
+                logger.exception(e)
+                await self._callback(MatrixCallback.from_exception(inference_id, e))
                 return None
             else:
                 logger.debug(f"Invoke endpoint response status: {response.status_code}")
-                await self._callback(MatrixCallback.from_response(response))
+                await self._callback(MatrixCallback.from_response(inference_id, response))
                 return response.json()
+
+    async def raise_no_inference_id_error(self, payload: dict) -> None:
+        await self._callback(
+            MatrixCallback(
+                status=InferenceProxyStatus.INTERNAL_ERROR,
+                msg=f"Missing 'inference_id' or 'inferenceId' in payload: {payload}",
+            )
+        )
 
     async def _callback(self, callback_params: MatrixCallback) -> None:
         transport = httpx.HTTPTransport(
