@@ -78,6 +78,7 @@ class SQSBridge(QueueBridge):
             QueueUrl=self.make_job_queue_url(endpoint_name),
             MessageBody=job.model_dump_json(),
         )
+        logger.debug(f"Job {job.inference_id} enqueued")
         return job.inference_id
 
     async def dequeue_job(
@@ -87,6 +88,7 @@ class SQSBridge(QueueBridge):
         size: int = 1,
     ) -> int:
         url = self.make_job_queue_url(endpoint_name)
+        logger.debug(f"Polling job from queue: {url}")
         return await self._poll_job_and_execute(process_func, url, size)
 
     async def enqueue_result(self, result: InferenceResult) -> str:
@@ -96,24 +98,26 @@ class SQSBridge(QueueBridge):
         response_body = (
             {
                 "content": base64.b64encode(json.dumps(result.payload).encode()).decode(),
-                "message": result.messages,
+                "message": result.message,
                 "encoding": "BASE64",
             }
             if result.status == InferenceResultStatus.COMPLETED
             else {
                 "content": result.payload,
-                "message": result.messages,
+                "message": result.message,
             }
         )
 
         message = {
-            "Message": {
-                "invocationStatus": invocation_status,
-                "eventName": "InferenceResult",
-                "responseBody": response_body,
-                "inferenceId": result.inference_id,
-                "eventName": "InferenceResult",
-            }
+            "Message": json.dumps(
+                {
+                    "invocationStatus": invocation_status,
+                    "eventName": "InferenceResult",
+                    "responseBody": response_body,
+                    "inferenceId": result.inference_id,
+                    "eventName": "InferenceResult",
+                }
+            )
         }
 
         await run_in_threadpool(
@@ -121,9 +125,11 @@ class SQSBridge(QueueBridge):
             QueueUrl=self.bridge_result_queue_url,
             MessageBody=json.dumps(message),
         )
+        logger.debug(f"Result {result.inference_id} enqueued")
         return result.inference_id
 
     async def dequeue_result(self, process_func: Awaitable[InferenceResult], size: int = 10) -> int:
+        logger.debug(f"Polling result from queue: {self.bridge_result_queue_url}")
         return await self._poll_result_and_execute(process_func, self.bridge_result_queue_url, size)
 
     async def _poll_job_and_execute(self, process_func: Awaitable[InferenceJob], url, size) -> int:
@@ -184,8 +190,11 @@ class SQSBridge(QueueBridge):
         else:
             messages = await self._poll_result_message(url, size)
 
+        logger.debug(f"Got {len(messages)} messages")
         for result, receipt_handle in messages:
-            await self._wrap_process_func(process_func, result, receipt_handle)
+            await self._wrap_process_func(
+                process_func, result, self.bridge_result_queue_url, receipt_handle
+            )
         return len(messages)
 
     async def _poll_result_message(
@@ -208,10 +217,14 @@ class SQSBridge(QueueBridge):
                 message_body = json.loads(message["Body"])
                 message = json.loads(message_body["Message"])
             except Exception as e:
+                logger.error(f"Error parsing message {message}: {e}")
+                logger.exception(e)
                 continue
             if "eventName" in message and message["eventName"] != "InferenceResult":
+                logger.warning(f"Unexpected message {message}. Message will be ignored.")
                 continue
             if "invocationStatus" in message and message["invocationStatus"] == "Failed":
+                logger.debug(f"Result {message['inferenceId']} failed")
                 valid_messages.append(
                     (
                         InferenceResult(
@@ -225,8 +238,14 @@ class SQSBridge(QueueBridge):
                 )
                 continue
             try:
-                inference_result = InferenceResult.model_validate_json(
-                    base64.b64decode(message["responseBody"]["content"]).decode("utf-8")
+                logger.debug(f"Result {message['inferenceId']} completed")
+                inference_result = InferenceResult(
+                    inference_id=message["inferenceId"],
+                    status=InferenceResultStatus.COMPLETED,
+                    message=message["responseBody"]["message"],
+                    payload=json.loads(
+                        base64.b64decode(message["responseBody"]["content"]).decode("utf-8")
+                    ),
                 )
                 valid_messages.append(
                     (

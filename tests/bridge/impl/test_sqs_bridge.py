@@ -1,6 +1,11 @@
 import pytest
 
 from moriarty.matrix.job_manager.bridge.impl.sqs_bridge import SQSBridge
+from moriarty.matrix.job_manager.params import (
+    InferenceJob,
+    InferenceResult,
+    InferenceResultStatus,
+)
 
 
 @pytest.fixture
@@ -34,3 +39,55 @@ def sqs_bridge(case_id):
         sqs.delete_queue(QueueUrl=result_queue_url)
     except sqs.exceptions.QueueDoesNotExist:
         pass
+
+
+async def test_bridge_job(sqs_bridge: SQSBridge):
+    _called = False
+    input_job = InferenceJob(
+        inference_id="test",
+        payload={"input": "test"},
+    )
+    job = await sqs_bridge.enqueue_job("test", job=input_job)
+
+    assert job
+
+    async def _process_func(job: InferenceJob):
+        nonlocal _called
+        _called = True
+        assert job == input_job
+
+    await sqs_bridge.dequeue_job("test", _process_func)
+
+    assert _called
+
+
+@pytest.mark.parametrize(
+    "inference_result",
+    [
+        InferenceResult(
+            inference_id="test",
+            status=InferenceResultStatus.COMPLETED,
+            message="Oh yeah",
+            payload={"output": "test"},
+        ),
+        InferenceResult(
+            inference_id="test",
+            status=InferenceResultStatus.FAILED,
+            message="Oh no",
+            payload={"error": "test"},
+        ),
+    ],
+)
+async def test_bridge_result(sqs_bridge: SQSBridge, inference_result: InferenceResult):
+    _called = False
+
+    await sqs_bridge.enqueue_result(inference_result)
+
+    async def _process_func(result: InferenceResult):
+        nonlocal _called
+        _called = True
+        assert result == inference_result
+
+    await sqs_bridge.dequeue_result(_process_func)
+
+    assert _called

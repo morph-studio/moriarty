@@ -10,6 +10,7 @@ from moriarty.sidecar.params import InferenceProxyStatus, MatrixCallback
 
 class InferenceJob(BaseModel):
     inference_id: str
+    payload: dict
 
 
 class InferenceResultStatus(enum.Enum):
