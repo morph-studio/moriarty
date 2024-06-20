@@ -60,7 +60,7 @@ class InferencerConsumer:
             enable_reprocess_timeout_job=enable_retry,
             enable_dead_queue=False,
             process_timeout=self.process_timeout,
-            delete_messgae_after_process=True,
+            delete_message_after_process=True,
             **kwargs,
         )
         self.daemon = Daemon(*[self._consumer_builder() for _ in range(concurrency)])
