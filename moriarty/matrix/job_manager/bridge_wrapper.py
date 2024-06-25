@@ -83,7 +83,6 @@ class BridgeWrapper:
         bridge: str | QueueBridge,
         endpoint_name: str,
         process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
-        size: int = None,
         *bridge_args,
         **bridge_kwargs,
     ) -> int:
@@ -93,17 +92,17 @@ class BridgeWrapper:
                 *bridge_args,
                 **bridge_kwargs,
             )
-        process_func = ensure_awaitable(process_func)
 
         avaliable_priorities = bridge.list_priorities(endpoint_name)
         sampled_priority = sample_as_weights(avaliable_priorities)
         logger.info(
             f"Sampled priority: {sampled_priority} from {avaliable_priorities} for {endpoint_name}"
         )
-        return await bridge.dequeue_job(
-            process_func,
+        return await self.dequeue_job(
+            bridge,
             endpoint_name=endpoint_name,
-            size=size,
+            process_func=process_func,
+            size=1,
             priority=sampled_priority,
         )
 
