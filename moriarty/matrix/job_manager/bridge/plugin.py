@@ -81,16 +81,24 @@ class QueueBridge:
     ):
         self.bridge_result_queue_url = bridge_result_queue_url
 
-    def make_job_queue_url(self, endpoint_name: str) -> str:
+    def make_job_queue_url(self, endpoint_name: str, priority: int = None) -> str:
         raise NotImplementedError
 
-    def remove_job_queue(self, endpoint_name: str) -> None:
+    def remove_job_queue(self, endpoint_name: str, priority: int = None) -> None:
         raise NotImplementedError
 
-    async def enqueue_job(self, job: InferenceJob) -> str:
+    async def list_priorities(self, endpoint_name: str) -> list[int]:
         raise NotImplementedError
 
-    async def dequeue_job(self, process_func: Awaitable[InferenceJob], size: int = None) -> int:
+    async def enqueue_job(self, job: InferenceJob, priority: int = None) -> str:
+        raise NotImplementedError
+
+    async def dequeue_job(
+        self,
+        process_func: Awaitable[InferenceJob],
+        size: int = None,
+        priority: int = None,
+    ) -> int:
         raise NotImplementedError
 
     async def enqueue_result(self, result: InferenceResult) -> str:

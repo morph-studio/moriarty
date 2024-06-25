@@ -9,7 +9,17 @@ from moriarty.matrix.job_manager.params import (
 
 
 @pytest.fixture
-def sqs_bridge(case_id):
+def endpoint_name(case_id):
+    return f"test-{case_id}"
+
+
+@pytest.fixture
+def priority():
+    return 0
+
+
+@pytest.fixture
+def sqs_bridge(case_id, endpoint_name, priority):
     try:
         import boto3
 
@@ -19,8 +29,8 @@ def sqs_bridge(case_id):
     except Exception:
         pytest.skip("boto3 is not configured")
 
-    job_queue_name = f"moriarty-bridge-job-test-{case_id}"
-    result_queue_name = f"moriarty-bridge-result-test-{case_id}"
+    job_queue_name = f"moriarty-bridge-{endpoint_name}-{priority}"
+    result_queue_name = f"moriarty-bridge-result-{case_id}"
     try:
         job_queue_url = sqs.create_queue(QueueName=job_queue_name)["QueueUrl"]
         result_queue_url = sqs.create_queue(QueueName=result_queue_name)["QueueUrl"]
@@ -32,7 +42,7 @@ def sqs_bridge(case_id):
     bridge = SQSBridge(
         bridge_result_queue_url=result_queue_url,
     )
-    bridge.make_job_queue_url = lambda _: job_queue_url
+    bridge.make_job_queue_url = lambda endpoint_name, priority: job_queue_url
     yield bridge
     try:
         sqs.delete_queue(QueueUrl=job_queue_url)
@@ -78,7 +88,12 @@ async def test_bridge_job(sqs_bridge: SQSBridge):
         ),
     ],
 )
-async def test_bridge_result(sqs_bridge: SQSBridge, inference_result: InferenceResult):
+async def test_bridge_result(
+    sqs_bridge: SQSBridge,
+    inference_result: InferenceResult,
+    endpoint_name,
+    priority,
+):
     _called = False
 
     await sqs_bridge.enqueue_result(inference_result)
@@ -91,3 +106,5 @@ async def test_bridge_result(sqs_bridge: SQSBridge, inference_result: InferenceR
     await sqs_bridge.dequeue_result(_process_func)
 
     assert _called
+
+    await sqs_bridge.list_priorities(endpoint_name) == [priority]

@@ -35,6 +35,7 @@ class BridgeWrapper:
         bridge: str | QueueBridge,
         endpoint_name: str,
         job: InferenceJob,
+        priority: int = None,
         *bridge_args,
         **bridge_kwargs,
     ) -> str:
@@ -47,6 +48,7 @@ class BridgeWrapper:
         await bridge.enqueue_job(
             job,
             endpoint_name=endpoint_name,
+            priority=priority,
         )
         return job.job_id
 
@@ -56,6 +58,7 @@ class BridgeWrapper:
         endpoint_name: str,
         process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
         size: int = None,
+        priority: int = None,
         *bridge_args,
         **bridge_kwargs,
     ) -> int:
@@ -71,6 +74,7 @@ class BridgeWrapper:
             process_func,
             endpoint_name=endpoint_name,
             size=size,
+            priority=priority,
         )
 
     async def enqueue_result(
