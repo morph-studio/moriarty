@@ -78,13 +78,13 @@ async def test_bridge_job(sqs_bridge: SQSBridge):
             inference_id="test",
             status=InferenceResultStatus.COMPLETED,
             message="Oh yeah",
-            payload={"output": "test"},
+            payload='{"output": "test"}',
         ),
         InferenceResult(
             inference_id="test",
             status=InferenceResultStatus.FAILED,
             message="Oh no",
-            payload={"error": "test"},
+            payload='{"error": "test"}',
         ),
     ],
 )

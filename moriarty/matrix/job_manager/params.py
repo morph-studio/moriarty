@@ -11,6 +11,10 @@ from moriarty.sidecar.params import InferenceProxyStatus, MatrixCallback
 class InferenceJob(BaseModel):
     inference_id: str
     payload: dict
+    """
+    Request payload
+    """
+    metadata: dict = dict()
 
 
 class InferenceResultStatus(enum.Enum):
@@ -22,7 +26,10 @@ class InferenceResult(BaseModel):
     inference_id: str
     status: InferenceResultStatus
     message: Optional[str] = None
-    payload: dict
+    payload: Optional[str] = None
+    """
+    Response payload
+    """
 
     @classmethod
     def from_proxy_callback(cls, callback: MatrixCallback) -> InferenceResult:

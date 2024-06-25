@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 
 from moriarty.log import logger
 from moriarty.matrix.connector.invoker import Invoker, get_invoker
-from moriarty.matrix.connector.params import InvokeParams
+from moriarty.matrix.connector.params import InvokeParams, InvokeResponse
 
 TOKEN = os.getenv("MORIARTY_CONNECTOR_TOKEN")
 
@@ -28,7 +28,7 @@ async def invoke(
     params: InvokeParams,
     invoker: Invoker = Depends(get_invoker),
     token: str = Query(None),
-):
+) -> InvokeResponse:
     if TOKEN and token != TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized, check token")
     return await invoker.invoke(params)
