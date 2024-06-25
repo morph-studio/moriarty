@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
+import random
 from functools import wraps
 
 import anyio
@@ -28,3 +29,10 @@ def ensure_awaitable(func):
         return await anyio.to_thread.run_sync(func, *args)
 
     return wrapper
+
+
+def sample_as_weights(available_priorities: list[int]) -> int:
+    total = sum(available_priorities)
+    weights = [p / total for p in available_priorities]
+    chosen_priority = random.choices(available_priorities, weights)[0]
+    return chosen_priority

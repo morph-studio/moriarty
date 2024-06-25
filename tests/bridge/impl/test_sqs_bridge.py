@@ -15,7 +15,7 @@ def endpoint_name(case_id):
 
 @pytest.fixture
 def priority():
-    return 0
+    return 1
 
 
 @pytest.fixture

@@ -2,10 +2,11 @@ from typing import Any, Awaitable, Callable
 
 from fastapi import Depends
 
+from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge.manager import BridgeManager
 from moriarty.matrix.job_manager.bridge.plugin import QueueBridge
 from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
-from moriarty.tools import ensure_awaitable
+from moriarty.tools import ensure_awaitable, sample_as_weights
 
 
 def get_bridge_manager():
@@ -75,6 +76,35 @@ class BridgeWrapper:
             endpoint_name=endpoint_name,
             size=size,
             priority=priority,
+        )
+
+    async def sample_job(
+        self,
+        bridge: str | QueueBridge,
+        endpoint_name: str,
+        process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
+        size: int = None,
+        *bridge_args,
+        **bridge_kwargs,
+    ) -> int:
+        if isinstance(bridge, str):
+            bridge = self.get_bridge(
+                bridge,
+                *bridge_args,
+                **bridge_kwargs,
+            )
+        process_func = ensure_awaitable(process_func)
+
+        avaliable_priorities = bridge.list_priorities(endpoint_name)
+        sampled_priority = sample_as_weights(avaliable_priorities)
+        logger.info(
+            f"Sampled priority: {sampled_priority} from {avaliable_priorities} for {endpoint_name}"
+        )
+        return await bridge.dequeue_job(
+            process_func,
+            endpoint_name=endpoint_name,
+            size=size,
+            priority=sampled_priority,
         )
 
     async def enqueue_result(

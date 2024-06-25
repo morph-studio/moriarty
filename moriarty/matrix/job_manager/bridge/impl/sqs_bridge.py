@@ -58,7 +58,7 @@ class SQSBridge(QueueBridge):
         return f"moriarty-bridge-{endpoint_name}"
 
     def make_queue_name(self, endpoint_name: str, priority: int = None) -> str:
-        priority = priority or 0
+        priority = priority or 1
         return f"{self._get_queue_url_prefix(endpoint_name)}-{priority}"
 
     async def list_priorities(self, endpoint_name: str) -> list[int]:
