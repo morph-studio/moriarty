@@ -7,7 +7,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 import docker
+from moriarty import mock
 from moriarty.matrix.connector.app import app as APP
+from moriarty.matrix.connector.invoker import get_bridge_name
+from moriarty.matrix.job_manager.bridge.manager import BridgeManager
+from moriarty.matrix.job_manager.bridge_wrapper import get_bridge_manager
 
 if TYPE_CHECKING:
     from docker import DockerClient
@@ -31,8 +35,18 @@ def docker_client():
 
 
 @pytest.fixture
-async def app():
-    APP.dependency_overrides = {}
+def bridge_manager():
+    bm = BridgeManager()
+    bm._load_dir(mock)
+    yield bm
+
+
+@pytest.fixture
+async def app(bridge_manager):
+    APP.dependency_overrides = {
+        get_bridge_name: lambda: "mock",
+        get_bridge_manager: lambda: bridge_manager,
+    }
     yield APP
 
 

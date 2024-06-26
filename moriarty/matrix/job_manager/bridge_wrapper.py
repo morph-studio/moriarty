@@ -47,8 +47,8 @@ class BridgeWrapper:
                 **bridge_kwargs,
             )
         await bridge.enqueue_job(
-            job,
             endpoint_name=endpoint_name,
+            job=job,
             priority=priority,
         )
         return job.job_id
@@ -72,8 +72,8 @@ class BridgeWrapper:
         process_func = ensure_awaitable(process_func)
 
         return await bridge.dequeue_job(
-            process_func,
             endpoint_name=endpoint_name,
+            process_func=process_func,
             size=size,
             priority=priority,
         )

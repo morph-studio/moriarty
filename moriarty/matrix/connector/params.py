@@ -18,7 +18,7 @@ class InvokeParams(BaseModel):
     1-100, Higher number means higher priority
     """
 
-    created_at: datetime
+    created_at: datetime = datetime.now()
     expires_at: Optional[datetime] = None
 
     def model_dump_metadata(self) -> dict:

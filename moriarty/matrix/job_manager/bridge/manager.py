@@ -15,10 +15,9 @@ import pluggy
 from moriarty.exceptions import PluginInitializationError, PluginNotFoundError
 from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge import impl, plugin
-from moriarty.utils import Singleton
 
 
-class BridgeManager(metaclass=Singleton):
+class BridgeManager:
     def __init__(self):
         self.pm = pluggy.PluginManager(plugin.project_name)
         self.pm.add_hookspecs(plugin)

@@ -40,7 +40,7 @@ class Invoker:
                     **params.invoke_params,
                     "inference_id": inference_id,  # Patch inference_id in payload
                 },
-                metadata=params.model_dump_metadata(params),
+                metadata=params.model_dump_metadata(),
             ),
             priority=params.priority,
         )
