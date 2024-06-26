@@ -46,12 +46,11 @@ class BridgeWrapper:
                 *bridge_args,
                 **bridge_kwargs,
             )
-        await bridge.enqueue_job(
+        return await bridge.enqueue_job(
             endpoint_name=endpoint_name,
             job=job,
             priority=priority,
         )
-        return job.job_id
 
     async def dequeue_job(
         self,

@@ -17,3 +17,4 @@ def test_invoke(client):
         ).model_dump_json(),
     )
     assert response.status_code == 200
+    assert response.json() == {"inference_id": "test"}

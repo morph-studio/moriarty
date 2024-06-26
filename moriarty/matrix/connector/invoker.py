@@ -44,3 +44,4 @@ class Invoker:
             ),
             priority=params.priority,
         )
+        return InvokeResponse(inference_id=inference_id)
