@@ -93,7 +93,10 @@ class BridgeWrapper:
                 **bridge_kwargs,
             )
 
-        avaliable_priorities = bridge.list_priorities(endpoint_name)
+        avaliable_priorities = bridge.list_avaliable_priorities(endpoint_name)
+        if not avaliable_priorities:
+            return 0
+
         sampled_priority = sample_as_weights(avaliable_priorities)
         logger.info(
             f"Sampled priority: {sampled_priority} from {avaliable_priorities} for {endpoint_name}"

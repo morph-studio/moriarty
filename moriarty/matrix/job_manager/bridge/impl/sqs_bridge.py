@@ -61,7 +61,7 @@ class SQSBridge(QueueBridge):
         priority = priority or 1
         return f"{self._get_queue_url_prefix(endpoint_name)}-{priority}"
 
-    async def list_priorities(self, endpoint_name: str) -> list[int]:
+    async def list_avaliable_priorities(self, endpoint_name: str) -> list[int]:
         def _():
             priorities = []
             response = self.client.list_queues(
@@ -69,6 +69,12 @@ class SQSBridge(QueueBridge):
             )
             while response["QueueUrls"]:
                 for url in response["QueueUrls"]:
+                    response = self.client.get_queue_attributes(
+                        QueueUrl=url, AttributeNames=["ApproximateNumberOfMessages"]
+                    )
+                    if int(response["Attributes"]["ApproximateNumberOfMessages"]) == 0:
+                        continue
+
                     queue_name = url.split("/")[-1]
                     priority = int(queue_name.split("-")[-1])
                     priorities.append(priority)

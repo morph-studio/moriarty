@@ -7,6 +7,10 @@ from moriarty.log import logger
 from moriarty.matrix.connector.invoker import Invoker, get_invoker
 from moriarty.matrix.connector.params import InvokeParams, InvokeResponse
 
+"""
+TODO: Switch to oauth and other authentication
+"""
+
 TOKEN = os.getenv("MORIARTY_CONNECTOR_TOKEN")
 
 

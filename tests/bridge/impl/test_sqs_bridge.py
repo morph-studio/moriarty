@@ -103,8 +103,9 @@ async def test_bridge_result(
         _called = True
         assert result == inference_result
 
+    await sqs_bridge.list_avaliable_priorities(endpoint_name) == [priority]
     await sqs_bridge.dequeue_result(_process_func)
 
     assert _called
 
-    await sqs_bridge.list_priorities(endpoint_name) == [priority]
+    await sqs_bridge.list_avaliable_priorities(endpoint_name) == []

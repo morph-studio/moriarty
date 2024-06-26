@@ -87,7 +87,7 @@ class QueueBridge:
     def remove_job_queue(self, endpoint_name: str, priority: int = None) -> None:
         raise NotImplementedError
 
-    async def list_priorities(self, endpoint_name: str) -> list[int]:
+    async def list_avaliable_priorities(self, endpoint_name: str) -> list[int]:
         raise NotImplementedError
 
     async def enqueue_job(self, job: InferenceJob, priority: int = None) -> str:
