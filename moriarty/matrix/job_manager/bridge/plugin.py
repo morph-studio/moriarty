@@ -106,6 +106,6 @@ class QueueBridge:
         raise NotImplementedError
 
     async def dequeue_result(
-        self, process_func: Awaitable[InferenceResult], size: int = None
+        self, process_func: Awaitable[InferenceResult], size: int = 10
     ) -> list[InferenceResult]:
         raise NotImplementedError

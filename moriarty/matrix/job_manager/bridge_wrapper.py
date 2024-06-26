@@ -57,7 +57,7 @@ class BridgeWrapper:
         bridge: str | QueueBridge,
         endpoint_name: str,
         process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
-        size: int = None,
+        size: int = 1,
         priority: int = None,
         *bridge_args,
         **bridge_kwargs,
@@ -92,7 +92,7 @@ class BridgeWrapper:
                 **bridge_kwargs,
             )
 
-        avaliable_priorities = bridge.list_avaliable_priorities(endpoint_name)
+        avaliable_priorities = await bridge.list_avaliable_priorities(endpoint_name)
         if not avaliable_priorities:
             return 0
 
@@ -123,17 +123,16 @@ class BridgeWrapper:
                 *bridge_args,
                 **bridge_kwargs,
             )
-        await bridge.enqueue_result(
+        return await bridge.enqueue_result(
             result,
         )
-        return result.job_id
 
     async def dequeue_result(
         self,
         bridge: str | QueueBridge,
         bridge_result_queue_url: str,
         process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
-        size: int = None,
+        size: int = 10,
         *bridge_args,
         **bridge_kwargs,
     ) -> InferenceResult:
