@@ -12,6 +12,10 @@ from moriarty.log import logger
 from moriarty.matrix.operator.spawner import impl, plugin
 
 
+def get_spawner_manager() -> SpawnerManager:
+    return SpawnerManager()
+
+
 class SpawnerManager:
     def __init__(self):
         self.pm = pluggy.PluginManager(plugin.project_name)
