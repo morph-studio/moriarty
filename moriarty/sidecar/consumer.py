@@ -102,7 +102,7 @@ class InferencerConsumer:
         )
         async with httpx.AsyncClient(transport=transport, follow_redirects=True) as client:
             try:
-                await client.post(self.callback_url, json=callback_params.model_dump())
+                await client.post(self.callback_url, data=callback_params.model_dump_json())
             except httpx.ConnectError as e:
                 logger.error(f"Callback failed: {e}")
 

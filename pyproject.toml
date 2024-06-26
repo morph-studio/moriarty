@@ -14,6 +14,7 @@ dependencies = [
     "loguru",
     "click",
     "anyio",
+    "importlib_metadata",
     "async-timeout;python_version<'3.11'",
 ]
 dynamic = ["version"]
@@ -36,6 +37,7 @@ service = [
     "fastapi",
     "pluggy",
     "kubernetes_asyncio",
+    "alembic",
 ]
 test = [
     "pytest",

@@ -1,6 +1,9 @@
 import click
 import uvicorn
 
+from moriarty.matrix.operator.config import get_config
+from moriarty.matrix.operator.dbutils import drop_all_data, get_db_url, upgrade_in_place
+
 from .app import app
 
 
@@ -16,7 +19,29 @@ def start(host, port):
 
 @click.command()
 def init():
-    pass
+    config = get_config()
+
+    upgrade_in_place(
+        db_url=get_db_url(config, async_mode=False),
+    )
+
+
+@click.command()
+@click.option("--yes", "-y", is_flag=True, default=False)
+def drop(yes):
+    """
+    Drop all data before testing or other purposes.
+
+    This command is not visible in the CLI. Only use it in tests for now.
+    """
+    if not yes:
+        click.confirm("Are you sure you want to drop all data?", abort=True)
+
+    click.echo("Dropping all data...")
+
+    config = get_config()
+    db_url = get_db_url(config, async_mode=False)
+    drop_all_data(db_url)
 
 
 @click.group()
@@ -26,3 +51,4 @@ def cli():
 
 cli.add_command(init)
 cli.add_command(start)
+# cli.add_command(drop) # noqa: not visible in CLI
