@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import socket
+from functools import partial
 from typing import TYPE_CHECKING
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -53,3 +55,8 @@ async def app(bridge_manager):
 @pytest.fixture
 def client(app):
     return TestClient(app)
+
+
+@pytest.fixture
+async def async_client(app):
+    return partial(httpx.AsyncClient, app=app)

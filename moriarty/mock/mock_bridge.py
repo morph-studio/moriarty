@@ -26,13 +26,13 @@ class MockBridge(QueueBridge, metaclass=Singleton):
         self.result_queue = []
 
     def make_job_queue_url(self, endpoint_name: str, priority: int = None) -> str:
-        priority = int(priority) or 100
+        priority = priority or 100
         endpoint_queue_map = self.endpoints.setdefault(endpoint_name, {})
         endpoint_queue_map.setdefault(priority, [])
         return f"{endpoint_name}.{priority}"
 
     def remove_job_queue(self, endpoint_name: str, priority: int = None) -> None:
-        priority = int(priority) or 100
+        priority = priority or 100
         endpoint_queue_map = self.endpoints.setdefault(endpoint_name, {})
         endpoint_queue_map[priority] = []
 

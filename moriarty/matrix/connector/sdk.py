@@ -46,7 +46,7 @@ async def invoke(
         logger.debug(f"Invoke endpoint: {url} with payload: {payload}")
         return await client.post(
             url,
-            json=payload.model_dump(),
+            data=payload.model_dump_json(),
             timeout=60,
             **client_kwargs,
         )
