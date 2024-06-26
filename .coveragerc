@@ -4,3 +4,4 @@ omit =
     */alembic/*
     **/cli.py
     **/impl/*
+    **/mock/*

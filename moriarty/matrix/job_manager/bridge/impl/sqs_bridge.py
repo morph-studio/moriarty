@@ -54,12 +54,44 @@ class SQSBridge(QueueBridge):
             )
         return boto3.client("sqs")
 
-    def make_queue_name(self, endpoint_name: str) -> str:
-        return f"moriarty-job-{endpoint_name}"
+    def _get_queue_url_prefix(self, endpoint_name: str) -> str:
+        return f"moriarty-bridge-{endpoint_name}"
+
+    def make_queue_name(self, endpoint_name: str, priority: int = None) -> str:
+        priority = priority or 100
+        return f"{self._get_queue_url_prefix(endpoint_name)}-{priority}"
+
+    async def list_avaliable_priorities(self, endpoint_name: str) -> list[int]:
+        def _():
+            priorities = []
+            response = self.client.list_queues(
+                QueueNamePrefix=self._get_queue_url_prefix(endpoint_name)
+            )
+            while response["QueueUrls"]:
+                for url in response["QueueUrls"]:
+                    response = self.client.get_queue_attributes(
+                        QueueUrl=url, AttributeNames=["ApproximateNumberOfMessages"]
+                    )
+                    if int(response["Attributes"]["ApproximateNumberOfMessages"]) == 0:
+                        continue
+
+                    queue_name = url.split("/")[-1]
+                    priority = int(queue_name.split("-")[-1])
+                    priorities.append(priority)
+                if "NextToken" in response:
+                    response = self.client.list_queues(
+                        QueueNamePrefix=self._get_queue_url_prefix(endpoint_name),
+                        NextToken=response["NextToken"],
+                    )
+                else:
+                    break
+            return sorted(priorities)
+
+        return await run_in_threadpool(_)
 
     @cache
-    def make_job_queue_url(self, endpoint_name: str) -> str:
-        queue_name = self.make_queue_name(endpoint_name)
+    def make_job_queue_url(self, endpoint_name: str, priority: int = None) -> str:
+        queue_name = self.make_queue_name(endpoint_name, priority)
         try:
             return self.client.get_queue_url(QueueName=queue_name)["QueueUrl"]
         except self.client.exceptions.QueueDoesNotExist:
@@ -67,15 +99,16 @@ class SQSBridge(QueueBridge):
             response = self.client.create_queue(QueueName=queue_name)
             return response["QueueUrl"]
 
-    def remove_job_queue(self, endpoint_name: str) -> None:
-        queue_name = self.make_queue_name(endpoint_name)
+    def remove_job_queue(self, endpoint_name: str, priority: int = None) -> None:
+        queue_name = self.make_queue_name(endpoint_name, priority)
         self.client.delete_queue(QueueUrl=queue_name)
         logger.info(f"Queue {queue_name} removed")
 
-    async def enqueue_job(self, endpoint_name: str, job: InferenceJob) -> str:
+    async def enqueue_job(self, endpoint_name: str, job: InferenceJob, priority: int = None) -> str:
+        queue_url = self.make_job_queue_url(endpoint_name, priority=priority)
         await run_in_threadpool(
             self.client.send_message,
-            QueueUrl=self.make_job_queue_url(endpoint_name),
+            QueueUrl=queue_url,
             MessageBody=job.model_dump_json(),
         )
         logger.debug(f"Job {job.inference_id} enqueued")
@@ -86,8 +119,9 @@ class SQSBridge(QueueBridge):
         endpoint_name: str,
         process_func: Awaitable[InferenceJob],
         size: int = 1,
+        priority: int = None,
     ) -> int:
-        url = self.make_job_queue_url(endpoint_name)
+        url = self.make_job_queue_url(endpoint_name, priority)
         logger.debug(f"Polling job from queue: {url}")
         return await self._poll_job_and_execute(process_func, url, size)
 

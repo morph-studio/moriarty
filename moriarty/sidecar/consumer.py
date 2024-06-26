@@ -29,12 +29,12 @@ class InferencerConsumer:
         invoke_port: int = "8080",
         invoke_path: str = "/invocations",
         health_check_url: str = "/ping",
-        callbacl_url: str = "http://moriarty-operator:8081/api/callback",
+        callbacl_url: str = "http://moriarty-operator:8902/api/callback",
         enable_retry: bool = False,
         enable_ssl: bool = False,
         concurrency: int = 1,
-        process_timeout: int = 600,
-        healthy_check_timeout: int = 600,
+        process_timeout: int = 3600,
+        healthy_check_timeout: int = 1200,
         healthy_check_interval: int = 5,
         **kwargs,
     ):
@@ -60,7 +60,7 @@ class InferencerConsumer:
             enable_reprocess_timeout_job=enable_retry,
             enable_dead_queue=False,
             process_timeout=self.process_timeout,
-            delete_messgae_after_process=True,
+            delete_message_after_process=True,
             **kwargs,
         )
         self.daemon = Daemon(*[self._consumer_builder() for _ in range(concurrency)])

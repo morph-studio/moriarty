@@ -2,10 +2,11 @@ from typing import Any, Awaitable, Callable
 
 from fastapi import Depends
 
+from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge.manager import BridgeManager
 from moriarty.matrix.job_manager.bridge.plugin import QueueBridge
 from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
-from moriarty.tools import ensure_awaitable
+from moriarty.tools import ensure_awaitable, sample_as_weights
 
 
 def get_bridge_manager():
@@ -35,6 +36,7 @@ class BridgeWrapper:
         bridge: str | QueueBridge,
         endpoint_name: str,
         job: InferenceJob,
+        priority: int = None,
         *bridge_args,
         **bridge_kwargs,
     ) -> str:
@@ -44,18 +46,19 @@ class BridgeWrapper:
                 *bridge_args,
                 **bridge_kwargs,
             )
-        await bridge.enqueue_job(
-            job,
+        return await bridge.enqueue_job(
             endpoint_name=endpoint_name,
+            job=job,
+            priority=priority,
         )
-        return job.job_id
 
     async def dequeue_job(
         self,
         bridge: str | QueueBridge,
         endpoint_name: str,
         process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
-        size: int = None,
+        size: int = 1,
+        priority: int = None,
         *bridge_args,
         **bridge_kwargs,
     ) -> int:
@@ -68,9 +71,41 @@ class BridgeWrapper:
         process_func = ensure_awaitable(process_func)
 
         return await bridge.dequeue_job(
-            process_func,
             endpoint_name=endpoint_name,
+            process_func=process_func,
             size=size,
+            priority=priority,
+        )
+
+    async def sample_job(
+        self,
+        bridge: str | QueueBridge,
+        endpoint_name: str,
+        process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
+        *bridge_args,
+        **bridge_kwargs,
+    ) -> int:
+        if isinstance(bridge, str):
+            bridge = self.get_bridge(
+                bridge,
+                *bridge_args,
+                **bridge_kwargs,
+            )
+
+        avaliable_priorities = await bridge.list_avaliable_priorities(endpoint_name)
+        if not avaliable_priorities:
+            return 0
+
+        sampled_priority = sample_as_weights(avaliable_priorities)
+        logger.info(
+            f"Sampled priority: {sampled_priority} from {avaliable_priorities} for {endpoint_name}"
+        )
+        return await self.dequeue_job(
+            bridge,
+            endpoint_name=endpoint_name,
+            process_func=process_func,
+            size=1,
+            priority=sampled_priority,
         )
 
     async def enqueue_result(
@@ -88,17 +123,16 @@ class BridgeWrapper:
                 *bridge_args,
                 **bridge_kwargs,
             )
-        await bridge.enqueue_result(
+        return await bridge.enqueue_result(
             result,
         )
-        return result.job_id
 
     async def dequeue_result(
         self,
         bridge: str | QueueBridge,
         bridge_result_queue_url: str,
         process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
-        size: int = None,
+        size: int = 10,
         *bridge_args,
         **bridge_kwargs,
     ) -> InferenceResult:
