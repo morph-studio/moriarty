@@ -25,18 +25,29 @@ from moriarty.sidecar.params import MatrixCallback
 
 async def get_operaotr(
     spawner: plugin.Spawner = Depends(get_spawner),
+    session: AsyncSession = Depends(get_db_session),
+    redis_client: redis.Redis | redis.RedisCluster = Depends(get_redis_client),
     autoscaler_manager: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> Operator:
-    return Operator(spawner=spawner, autoscaler_manager=autoscaler_manager)
+    return Operator(
+        spawner=spawner,
+        session=session,
+        redis_client=redis_client,
+        autoscaler_manager=autoscaler_manager,
+    )
 
 
 class Operator:
     def __init__(
         self,
         spawner: plugin.Spawner,
+        session: AsyncSession,
+        redis_client: redis.Redis | redis.RedisCluster,
         autoscaler_manager: AutoscalerManager,
     ) -> None:
         self.spawner = spawner
+        self.session = session
+        self.redis_client = redis_client
         self.autoscaler_manager = autoscaler_manager
 
     async def handle_callback(self, callback: MatrixCallback, token: str = None) -> None: ...

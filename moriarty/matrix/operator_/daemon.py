@@ -3,16 +3,13 @@ import contextlib
 import signal
 
 import redis.asyncio as redis
-from fastapi import Depends
-from kubernetes_asyncio import client
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
 from moriarty.matrix.operator_.autoscaler import AutoscalerManager
 from moriarty.matrix.operator_.config import Config
-from moriarty.matrix.operator_.dbutils import get_db_session, open_db_session
-from moriarty.matrix.operator_.rds import get_redis_client, open_redis_client
-from moriarty.matrix.operator_.spawner import plugin
+from moriarty.matrix.operator_.dbutils import open_db_session
+from moriarty.matrix.operator_.rds import open_redis_client
 from moriarty.matrix.operator_.spawner.impl.k8s import KubeSpawner
 from moriarty.matrix.operator_.spawner.manager import SpawnerManager
 from moriarty.matrix.operator_.tools import load_kube_config
