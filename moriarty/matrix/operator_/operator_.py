@@ -3,33 +3,30 @@ from __future__ import annotations
 import os
 from functools import cached_property
 
+import redis.asyncio as redis
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.matrix.operator_.autoscaler import (
     AutoscalerManager,
     get_autoscaler_manager,
 )
+from moriarty.matrix.operator_.dbutils import get_db_session
 from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM
+from moriarty.matrix.operator_.rds import get_redis_client
 from moriarty.matrix.operator_.spawner import plugin
 from moriarty.matrix.operator_.spawner.manager import (
     SpawnerManager,
+    get_spawner,
     get_spawner_manager,
 )
 from moriarty.sidecar.params import MatrixCallback
 
 
-def get_spawner_name() -> str:
-    return os.getenv("MORIARTY_SPAWNER_NAME", "kube")
-
-
 async def get_operaotr(
-    spawner_name: str = Depends(get_spawner_name),
-    spawner_manager: SpawnerManager = Depends(get_spawner_manager),
+    spawner: plugin.Spawner = Depends(get_spawner),
     autoscaler_manager: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> Operator:
-    spawner = spawner_manager.init(spawner_name)
-    await spawner.prepare()
-
     return Operator(spawner=spawner, autoscaler_manager=autoscaler_manager)
 
 

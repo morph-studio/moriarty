@@ -12,7 +12,7 @@ from moriarty.matrix.operator_.dbutils import (
 )
 
 from .app import app
-from .autoscaler import KubeAutoscalerDaemon
+from .daemon import KubeAutoscalerDaemon
 
 
 def coro(f):
