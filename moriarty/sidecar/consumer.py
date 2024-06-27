@@ -23,7 +23,7 @@ class InferencerConsumer:
 
     def __init__(
         self,
-        redis_client: redis.Redis,
+        redis_client: redis.Redis | redis.RedisCluster,
         endpoint_name: str,
         invoke_host: str = "localhost",
         invoke_port: int = "8080",

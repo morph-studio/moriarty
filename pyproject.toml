@@ -38,6 +38,7 @@ service = [
     "pluggy",
     "kubernetes_asyncio",
     "alembic",
+    "jinja2",
 ]
 test = [
     "pytest",

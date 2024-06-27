@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 
 class InferenceProxyStatus(str, enum.Enum):
+    RUNNING = "RUNNING"
     FINISHED = "FINISHED"
     TIMEOUT = "TIMEOUT"
     INTERNAL_ERROR = "INTERNAL_ERROR"
