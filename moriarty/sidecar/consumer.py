@@ -68,7 +68,7 @@ class InferencerConsumer:
     async def _proxy(self, payload: dict) -> dict | None:
         inference_id = payload.get("inference_id") or payload.get("inferenceId")
         if not inference_id:
-            return await self.raise_no_inference_id_error(payload)
+            return await self.return_no_inference_id_error(payload)
         async with httpx.AsyncClient() as client:
             logger.debug(f"Invoke endpoint: {self.invoke_url}")
             try:
@@ -88,7 +88,7 @@ class InferencerConsumer:
                 await self._callback(MatrixCallback.from_response(inference_id, response))
                 return response.json()
 
-    async def raise_no_inference_id_error(self, payload: dict) -> None:
+    async def return_no_inference_id_error(self, payload: dict) -> None:
         await self._callback(
             MatrixCallback(
                 status=InferenceProxyStatus.INTERNAL_ERROR,
@@ -102,7 +102,7 @@ class InferencerConsumer:
         )
         async with httpx.AsyncClient(transport=transport, follow_redirects=True) as client:
             try:
-                await client.post(self.callback_url, json=callback_params.model_dump())
+                await client.post(self.callback_url, data=callback_params.model_dump_json())
             except httpx.ConnectError as e:
                 logger.error(f"Callback failed: {e}")
 
