@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import declarative_base
 
-from moriarty.matrix.operator.enums_ import EndpointMetrics
+from moriarty.matrix.operator_.enums_ import EndpointMetrics
 from moriarty.sidecar.params import InferenceProxyStatus
 
 Base = declarative_base()

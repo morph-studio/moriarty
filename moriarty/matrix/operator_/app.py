@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
 from moriarty.log import logger
-from moriarty.matrix.operator.operator import Operator, get_operaotr
+from moriarty.matrix.operator_.operator_ import Operator, get_operaotr
 from moriarty.sidecar.params import MatrixCallback
 
 

@@ -9,7 +9,7 @@ import pluggy
 
 from moriarty.exceptions import PluginInitializationError, PluginNotFoundError
 from moriarty.log import logger
-from moriarty.matrix.operator.spawner import impl, plugin
+from moriarty.matrix.operator_.spawner import impl, plugin
 
 
 def get_spawner_manager() -> SpawnerManager:

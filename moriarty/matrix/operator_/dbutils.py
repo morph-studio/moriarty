@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session
 
 from moriarty.log import logger
-from moriarty.matrix.operator.config import Config, get_config
-from moriarty.matrix.operator.orm import Base
+from moriarty.matrix.operator_.config import Config, get_config
+from moriarty.matrix.operator_.orm import Base
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -193,7 +193,7 @@ async def get_db_session(
 
 @asynccontextmanager
 async def open_db_session(
-    config: Config = Depends(get_config),
+    config: Config,
 ) -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(get_db_url(config, async_mode=True))
     factory = async_sessionmaker(engine)

@@ -12,9 +12,12 @@ from sqlalchemy import create_engine, text
 
 import docker
 from moriarty import mock
-from moriarty.matrix.operator.app import app as APP
-from moriarty.matrix.operator.cli import drop, init
-from moriarty.matrix.operator.spawner.manager import SpawnerManager, get_spawner_manager
+from moriarty.matrix.operator_.app import app as APP
+from moriarty.matrix.operator_.cli import drop, init
+from moriarty.matrix.operator_.spawner.manager import (
+    SpawnerManager,
+    get_spawner_manager,
+)
 
 if TYPE_CHECKING:
     from docker import DockerClient

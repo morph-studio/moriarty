@@ -1,4 +1,4 @@
-from moriarty.matrix.operator.spawner.plugin import Spawner, hookimpl
+from moriarty.matrix.operator_.spawner.plugin import Spawner, hookimpl
 
 
 class CustomSpawner(Spawner):

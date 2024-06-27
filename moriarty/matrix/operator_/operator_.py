@@ -5,9 +5,12 @@ from functools import cached_property
 
 from fastapi import Depends
 
-from moriarty.matrix.operator.orm import AutoscalerORM, EndpointORM
-from moriarty.matrix.operator.spawner import plugin
-from moriarty.matrix.operator.spawner.manager import SpawnerManager, get_spawner_manager
+from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM
+from moriarty.matrix.operator_.spawner import plugin
+from moriarty.matrix.operator_.spawner.manager import (
+    SpawnerManager,
+    get_spawner_manager,
+)
 from moriarty.sidecar.params import MatrixCallback
 
 

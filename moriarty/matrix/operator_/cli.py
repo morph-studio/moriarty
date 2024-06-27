@@ -4,8 +4,12 @@ from functools import wraps
 import click
 import uvicorn
 
-from moriarty.matrix.operator.config import get_config
-from moriarty.matrix.operator.dbutils import drop_all_data, get_db_url, upgrade_in_place
+from moriarty.matrix.operator_.config import get_config
+from moriarty.matrix.operator_.dbutils import (
+    drop_all_data,
+    get_db_url,
+    upgrade_in_place,
+)
 
 from .app import app
 from .autoscaler import KubeAutoscaler
@@ -35,7 +39,7 @@ async def autoscale():
     """
     Start autoscaling daemon for k8s.
     """
-    await KubeAutoscaler().run_forever()
+    await KubeAutoscaler(get_config()).run_forever()
 
 
 @click.command()

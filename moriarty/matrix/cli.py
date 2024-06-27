@@ -3,7 +3,7 @@ from pprint import pformat
 import click
 
 from .job_manager.bridge.manager import BridgeManager
-from .operator.spawner.manager import SpawnerManager
+from .operator_.spawner.manager import SpawnerManager
 
 
 @click.command()

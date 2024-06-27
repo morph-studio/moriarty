@@ -2,7 +2,13 @@ import asyncio
 import contextlib
 import signal
 
+from kubernetes import client, config, watch
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from moriarty.log import logger
+from moriarty.matrix.operator_.config import Config
+from moriarty.matrix.operator_.dbutils import open_db_session
+from moriarty.matrix.operator_.tools import load_kube_config
 
 
 async def event_wait(evt, timeout):
@@ -16,6 +22,7 @@ class DaemonMixin:
     def __init__(self) -> None:
         self._stop_event = asyncio.Event()
         self._task: None | asyncio.Task = None
+        load_kube_config()
 
     async def initialize(self):
         pass
@@ -74,4 +81,19 @@ class DaemonMixin:
 
 
 class KubeAutoscaler(DaemonMixin):
-    pass
+    def __init__(self, config: Config) -> None:
+        super().__init__()
+        self.config = config
+
+    async def initialize(self):
+        pass
+
+    async def run(self):
+        async with open_db_session(self.config) as session:
+            await self._scan_and_update(session)
+
+    async def _scan_and_update(self, session: AsyncSession) -> None:
+        pass
+
+    async def cleanup(self):
+        pass
