@@ -2,12 +2,15 @@ import asyncio
 import contextlib
 import signal
 
+import redis.asyncio as redis
+from fastapi import Depends
 from kubernetes_asyncio import client
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
 from moriarty.matrix.operator_.config import Config
-from moriarty.matrix.operator_.dbutils import open_db_session
+from moriarty.matrix.operator_.dbutils import get_db_session, open_db_session
+from moriarty.matrix.operator_.rds import get_redis_client, open_redis_client
 from moriarty.matrix.operator_.tools import load_kube_config
 
 
@@ -85,7 +88,22 @@ class DaemonMixin:
         logger.info(f"Autoscaler terminated")
 
 
-class KubeAutoscaler(DaemonMixin):
+def get_autoscaler_manager(
+    redis_client=Depends(get_redis_client),
+    session=Depends(get_db_session),
+):
+    return AutoscalerManager(redis_client=redis_client, session=session)
+
+
+class AutoscalerManager:
+    def __init__(
+        self, redis_client: redis.Redis | redis.RedisCluster, session: AsyncSession
+    ) -> None:
+        self.redis_client = redis_client
+        self.session = session
+
+
+class KubeAutoscalerDaemon(DaemonMixin):
     def __init__(self, config: Config) -> None:
         super().__init__()
         self.config = config
@@ -94,11 +112,14 @@ class KubeAutoscaler(DaemonMixin):
         await load_kube_config()
 
     async def run(self):
-        async with open_db_session(self.config) as session:
-            await self._scan_and_update(session)
+        async with open_redis_client(self.config) as redis_client:
+            async with open_db_session(self.config) as session:
+                await self._scan_and_update(session, redis_client)
 
-    async def _scan_and_update(self, session: AsyncSession) -> None:
-        pass
+    async def _scan_and_update(
+        self, session: AsyncSession, redis_client: redis.Redis | redis.RedisCluster
+    ) -> None:
+        manager = AutoscalerManager(redis_client=redis_client, session=session)
 
     async def cleanup(self):
         pass

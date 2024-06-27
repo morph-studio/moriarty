@@ -12,7 +12,7 @@ from moriarty.matrix.operator_.dbutils import (
 )
 
 from .app import app
-from .autoscaler import KubeAutoscaler
+from .autoscaler import KubeAutoscalerDaemon
 
 
 def coro(f):
@@ -39,7 +39,7 @@ async def autoscale():
     """
     Start autoscaling daemon for k8s.
     """
-    await KubeAutoscaler(get_config()).run_forever()
+    await KubeAutoscalerDaemon(get_config()).run_forever()
 
 
 @click.command()

@@ -5,6 +5,10 @@ from functools import cached_property
 
 from fastapi import Depends
 
+from moriarty.matrix.operator_.autoscaler import (
+    AutoscalerManager,
+    get_autoscaler_manager,
+)
 from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM
 from moriarty.matrix.operator_.spawner import plugin
 from moriarty.matrix.operator_.spawner.manager import (
@@ -18,23 +22,24 @@ def get_spawner_name() -> str:
     return os.getenv("MORIARTY_SPAWNER_NAME", "kube")
 
 
-def get_operaotr(
+async def get_operaotr(
     spawner_name: str = Depends(get_spawner_name),
-    spawner_manager=Depends(get_spawner_manager),
+    spawner_manager: SpawnerManager = Depends(get_spawner_manager),
+    autoscaler_manager: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> Operator:
-    return Operator(
-        spawner_name=spawner_name,
-        spawner_manager=spawner_manager,
-    )
+    spawner = spawner_manager.init(spawner_name)
+    await spawner.prepare()
+
+    return Operator(spawner=spawner, autoscaler_manager=autoscaler_manager)
 
 
 class Operator:
-    def __init__(self, spawner_name: str, spawner_manager: SpawnerManager):
-        self.spawner_name = spawner_name
-        self.spawner_manager = spawner_manager
-
-    @cached_property
-    def spawner(self) -> plugin.Spawner:
-        return self.spawner_manager.init(self.spawner_name)
+    def __init__(
+        self,
+        spawner: plugin.Spawner,
+        autoscaler_manager: AutoscalerManager,
+    ) -> None:
+        self.spawner = spawner
+        self.autoscaler_manager = autoscaler_manager
 
     async def handle_callback(self, callback: MatrixCallback, token: str = None) -> None: ...

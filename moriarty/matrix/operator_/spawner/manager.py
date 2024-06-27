@@ -84,7 +84,7 @@ class SpawnerManager:
             return
         self._registed_cls[cls_name] = cls
 
-    def init(self, c, *args, **kwargs: dict[str, Any]):
+    def init(self, c, *args, **kwargs: dict[str, Any]) -> plugin.Spawner:
         """
         Init a new subclass of plugin.Spawner.
 

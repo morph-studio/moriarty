@@ -1,5 +1,3 @@
-import asyncio
-
 from kubernetes_asyncio import config
 
 from moriarty.log import logger
