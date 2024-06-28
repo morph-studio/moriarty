@@ -109,7 +109,6 @@ class KubeAutoscalerDaemon(DaemonMixin):
         self.config = config
 
     async def initialize(self):
-        await load_kube_config()
         self.spawner = self.spawner_manager.init(KubeSpawner.register_name)
         await self.spawner.prepare()
 
@@ -125,9 +124,7 @@ class KubeAutoscalerDaemon(DaemonMixin):
         manager = AutoscalerManager(
             redis_client=redis_client, session=session, spawner=self.spawner
         )
-
-    async def cleanup(self):
-        pass
+        await manager.scan_and_update()
 
 
 class BridgeDaemon(DaemonMixin):

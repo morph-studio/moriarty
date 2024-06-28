@@ -29,3 +29,6 @@ class AutoscalerManager:
         self.redis_client = redis_client
         self.session = session
         self.spawner = spawner
+
+    async def scan_and_update(self) -> None:
+        pass

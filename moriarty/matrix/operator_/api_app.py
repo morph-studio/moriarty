@@ -16,16 +16,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.post("/callback")
-async def callback(
-    callback: MatrixCallback,
-    operator: Operator = Depends(get_operaotr),
-    token: str = Query(None),
-) -> Response:
-    await operator.handle_callback(callback, token)
-    return Response(status_code=200)
-
-
 @app.get("/")
 async def root():
     return {"message": "Hello World"}

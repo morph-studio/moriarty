@@ -11,7 +11,8 @@ from moriarty.matrix.operator_.dbutils import (
     upgrade_in_place,
 )
 
-from .app import app
+from .api_app import app as api_app
+from .callback_app import app as callback_app
 from .daemon import BridgeDaemon, KubeAutoscalerDaemon
 
 
@@ -25,12 +26,22 @@ def coro(f):
 
 @click.command()
 @click.option("--host", type=click.STRING, default="0.0.0.0")
-@click.option("--port", type=click.INT, default=8901)
-def start(host, port):
+@click.option("--port", type=click.INT, default=8999)
+def callback(host, port):
     """
     Start the server.
     """
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(callback_app, host=host, port=port)
+
+
+@click.command()
+@click.option("--host", type=click.STRING, default="0.0.0.0")
+@click.option("--port", type=click.INT, default=8902)
+def callback(host, port):
+    """
+    Start the server.
+    """
+    uvicorn.run(api_app, host=host, port=port)
 
 
 @click.command()
@@ -86,5 +97,5 @@ def cli():
 cli.add_command(init)
 cli.add_command(bridge)
 cli.add_command(autoscale)
-cli.add_command(start)
+cli.add_command(callback)
 # cli.add_command(drop) # noqa: not visible in CLI
