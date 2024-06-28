@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from glob import glob
 from pathlib import Path
 from subprocess import check_call
@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session
 
 from moriarty.log import logger
-from moriarty.matrix.operator.config import Config, get_config
-from moriarty.matrix.operator.orm import Base
+from moriarty.matrix.operator_.config import Config, get_config
+from moriarty.matrix.operator_.orm import Base
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -176,6 +176,24 @@ def get_db_url(
 
 async def get_db_session(
     config: Config = Depends(get_config),
+) -> AsyncGenerator[AsyncSession, None]:
+    """
+    For fastapi dependency injection
+    """
+    engine = create_async_engine(get_db_url(config, async_mode=True))
+    factory = async_sessionmaker(engine)
+    async with factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except exc.SQLAlchemyError as error:
+            await session.rollback()
+            raise
+
+
+@asynccontextmanager
+async def open_db_session(
+    config: Config,
 ) -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(get_db_url(config, async_mode=True))
     factory = async_sessionmaker(engine)

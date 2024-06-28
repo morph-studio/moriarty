@@ -24,7 +24,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from moriarty.matrix.operator import orm
+from moriarty.matrix.operator_ import orm
 
 target_metadata = orm.Base.metadata
 

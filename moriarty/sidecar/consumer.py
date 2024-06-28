@@ -23,13 +23,13 @@ class InferencerConsumer:
 
     def __init__(
         self,
-        redis_client: redis.Redis,
+        redis_client: redis.Redis | redis.RedisCluster,
         endpoint_name: str,
         invoke_host: str = "localhost",
         invoke_port: int = "8080",
         invoke_path: str = "/invocations",
         health_check_url: str = "/ping",
-        callbacl_url: str = "http://moriarty-operator:8902/api/callback",
+        callbacl_url: str = "http://moriarty-operator:8999/api/callback",
         enable_retry: bool = False,
         enable_ssl: bool = False,
         concurrency: int = 1,

@@ -2,18 +2,32 @@ from __future__ import annotations
 
 import glob
 import importlib
+import os
 from os.path import basename, dirname, isfile, join
 from typing import Any
 
 import pluggy
+from fastapi import Depends
 
 from moriarty.exceptions import PluginInitializationError, PluginNotFoundError
 from moriarty.log import logger
-from moriarty.matrix.operator.spawner import impl, plugin
+from moriarty.matrix.operator_.spawner import impl, plugin
+
+
+def get_spawner_name() -> str:
+    return os.getenv("MORIARTY_SPAWNER_NAME", "kube")
 
 
 def get_spawner_manager() -> SpawnerManager:
     return SpawnerManager()
+
+
+async def get_spawner(
+    spawner_name: str = Depends(get_spawner_name),
+    spawner_manager: SpawnerManager = Depends(get_spawner_manager),
+) -> plugin.Spawner:
+    spawner = spawner_manager.init(spawner_name)
+    await spawner.prepare()
 
 
 class SpawnerManager:
@@ -84,7 +98,7 @@ class SpawnerManager:
             return
         self._registed_cls[cls_name] = cls
 
-    def init(self, c, *args, **kwargs: dict[str, Any]):
+    def init(self, c, *args, **kwargs: dict[str, Any]) -> plugin.Spawner:
         """
         Init a new subclass of plugin.Spawner.
 

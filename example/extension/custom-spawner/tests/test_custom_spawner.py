@@ -1,6 +1,6 @@
 from custom_spawner.imp import CustomSpawner
 
-from moriarty.matrix.operator.spawner.manager import SpawnerManager
+from moriarty.matrix.operator_.spawner.manager import SpawnerManager
 
 
 def test_registed():

@@ -38,6 +38,7 @@ service = [
     "pluggy",
     "kubernetes_asyncio",
     "alembic",
+    "jinja2",
 ]
 test = [
     "pytest",
@@ -57,7 +58,7 @@ email = "jizhongsheng957@gmail.com"
 
 moriarty-init = "moriarty.init.cli:cli"
 moriarty-matrix = "moriarty.matrix.cli:cli"
-moriarty-operator = "moriarty.matrix.operator.cli:cli"
+moriarty-operator = "moriarty.matrix.operator_.cli:cli"
 moriarty-connector = "moriarty.matrix.connector.cli:cli"
 moriarty-sidecar = "moriarty.sidecar.cli:cli"
 moriarty-deploy = "moriarty.deploy.cli:cli"

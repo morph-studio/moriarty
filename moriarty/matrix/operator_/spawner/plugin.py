@@ -38,7 +38,7 @@ def register(manager):
         class CustomSpawner(Spawner):
             register_name = "example"
 
-        from moriarty.matrix.operator.spawner.plugin import hookimpl
+        from moriarty.matrix.operator_.spawner.plugin import hookimpl
 
         @hookimpl
         def register(manager):
@@ -59,3 +59,6 @@ def register(manager):
 
 class Spawner:
     register_name: str
+
+    async def prepare(self) -> None:
+        pass
