@@ -12,7 +12,7 @@ from moriarty.matrix.operator_.dbutils import (
 )
 
 from .app import app
-from .daemon import KubeAutoscalerDaemon
+from .daemon import BridgeDaemon, KubeAutoscalerDaemon
 
 
 def coro(f):
@@ -40,6 +40,15 @@ async def autoscale():
     Start autoscaling daemon for k8s.
     """
     await KubeAutoscalerDaemon(get_config()).run_forever()
+
+
+@click.command()
+@coro
+async def bridge():
+    """
+    Start bridge daemon.
+    """
+    await BridgeDaemon(get_config()).run_forever()
 
 
 @click.command()
@@ -75,6 +84,7 @@ def cli():
 
 
 cli.add_command(init)
+cli.add_command(bridge)
 cli.add_command(autoscale)
 cli.add_command(start)
 # cli.add_command(drop) # noqa: not visible in CLI
