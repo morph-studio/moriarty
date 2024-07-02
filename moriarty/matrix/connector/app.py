@@ -7,7 +7,8 @@ from moriarty.log import logger
 from moriarty.matrix.connector.invoker import Invoker, get_invoker
 from moriarty.matrix.connector.params import InvokeParams, InvokeResponse
 
-TOKEN = os.getenv("MORIARTY_MATRIX_TOKEN")
+_env_name = "MORIARTY_MATRIX_TOKEN"
+TOKEN = os.getenv(_env_name)
 
 
 @asynccontextmanager
@@ -29,7 +30,10 @@ async def verify_token(request, call_next):
         return await call_next(request)
 
     if TOKEN and request.headers.get("Authorization") != f"Bearer {TOKEN}":
-        return Response(status_code=401, content="Unauthorized, check token")
+        return Response(
+            status_code=401,
+            content=f"Unauthorized. Check environment {_env_name} for token.",
+        )
     return await call_next(request)
 
 
