@@ -16,10 +16,12 @@ if sys.version_info >= (3, 11):
 else:
     import async_timeout
 
+from .vars import GROUP_NAME, REDIS_PREFIX
+
 
 class InferencerConsumer:
-    REDIS_PREFIX = "moriarty-brq"
-    GROUP_NAME = "moriarty-inference-proxy"
+    REDIS_PREFIX = REDIS_PREFIX
+    GROUP_NAME = GROUP_NAME
 
     def __init__(
         self,

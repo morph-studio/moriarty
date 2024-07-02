@@ -42,6 +42,8 @@ class EndpointORM(Base):
         onupdate=func.now(),
         comment="Updated at",
     )
+    queue_capacity = Column(Integer, nullable=False, default=5)
+    available = Column(Boolean, nullable=False, default=True)
 
     # Container spec
     image = Column(String(255), nullable=True)

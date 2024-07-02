@@ -56,7 +56,7 @@ class BridgeWrapper:
         self,
         bridge: str | QueueBridge,
         endpoint_name: str,
-        process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
+        process_func: Callable[[InferenceJob], None] | Awaitable[InferenceJob],
         size: int = 1,
         priority: int = None,
         *bridge_args,
@@ -81,7 +81,7 @@ class BridgeWrapper:
         self,
         bridge: str | QueueBridge,
         endpoint_name: str,
-        process_func: Callable[[InferenceResult], None] | Awaitable[InferenceResult],
+        process_func: Callable[[InferenceJob], None] | Awaitable[InferenceJob],
         *bridge_args,
         **bridge_kwargs,
     ) -> int:
