@@ -4,11 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
 from moriarty.log import logger
+from moriarty.matrix.envs import MORIARTY_MATRIX_TOKEN_ENV
 from moriarty.matrix.operator_.operator_ import Operator, get_operaotr
 from moriarty.sidecar.params import MatrixCallback
 
-_env_name = "MORIARTY_MATRIX_TOKEN"
-TOKEN = os.getenv(_env_name)
+TOKEN = os.getenv(MORIARTY_MATRIX_TOKEN_ENV)
 
 
 @asynccontextmanager
@@ -31,7 +31,7 @@ async def verify_token(request, call_next):
     if TOKEN and request.headers.get("Authorization") != f"Bearer {TOKEN}":
         return Response(
             status_code=401,
-            content=f"Unauthorized. Check environment {_env_name} for token.",
+            content=f"Unauthorized. Check environment {MORIARTY_MATRIX_TOKEN_ENV} for token.",
         )
     return await call_next(request)
 
