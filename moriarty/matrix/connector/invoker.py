@@ -4,12 +4,13 @@ import uuid
 from fastapi import Depends
 
 from moriarty.matrix.connector.params import InvokeParams, InvokeResponse
+from moriarty.matrix.envs import MORIARTY_BRIDGE_NAME_ENV
 from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper, get_bridge_wrapper
 from moriarty.matrix.job_manager.params import InferenceJob
 
 
 def get_bridge_name() -> str:
-    return os.getenv("MORIARTY_BRIDGE_NAME", "sqs")
+    return os.getenv(MORIARTY_BRIDGE_NAME_ENV, "sqs")
 
 
 def get_invoker(

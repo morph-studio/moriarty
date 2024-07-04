@@ -17,7 +17,13 @@ from moriarty.matrix.operator_.dbutils import open_db_session
 from moriarty.matrix.operator_.operator_ import Bridger
 from moriarty.matrix.operator_.rds import open_redis_client
 from moriarty.matrix.operator_.spawner.impl.k8s import KubeSpawner
-from moriarty.matrix.operator_.spawner.manager import SpawnerManager
+from moriarty.matrix.operator_.spawner.manager import (
+    SpawnerManager,
+    get_spawner,
+    get_spawner_manager,
+    get_spawner_name,
+)
+from moriarty.matrix.operator_.spawner.plugin import Spawner
 from moriarty.matrix.operator_.tools import load_kube_config
 
 
@@ -113,7 +119,7 @@ class KubeAutoscalerDaemon(DaemonMixin):
         await self.spawner.prepare()
 
     async def run(self):
-        logger.info(f"Begin autoscaling...")
+        logger.info(f"Triggering autoscaler...")
         async with open_redis_client(self.config) as redis_client:
             async with open_db_session(self.config) as session:
                 await self._scan_and_update(session, redis_client)
@@ -136,11 +142,21 @@ class BridgeDaemon(DaemonMixin):
         self.bridge_wrapper = get_bridge_wrapper(bridge_manager=get_bridge_manager())
         self.config = config
 
+        self._spawner: Spawner | None = None
+
+    async def initialize(self):
+        self._spawner = await get_spawner(
+            spawner_name=get_spawner_name(),
+            spawner_manager=get_spawner_manager(),
+        )
+
     async def run(self):
-        logger.info(f"Begin bridging...")
+        logger.debug(f"Triggering bridge...")
+
         async with open_redis_client(self.config) as redis_client:
             async with open_db_session(self.config) as session:
                 bridger = Bridger(
+                    spawner=self._spawner,
                     bridge_name=self.bridge_name,
                     bridge_wrapper=self.bridge_wrapper,
                     redis_client=redis_client,

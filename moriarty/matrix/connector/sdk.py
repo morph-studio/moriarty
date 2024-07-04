@@ -6,6 +6,7 @@ import httpx
 
 from moriarty.log import logger
 from moriarty.matrix.connector.params import InvokeParams
+from moriarty.matrix.envs import MORIARTY_CONNECTOR_ENDPOINT_ENV
 
 
 async def invoke(
@@ -15,7 +16,7 @@ async def invoke(
     priority: int = None,
     created_at: datetime | int = None,
     expires_at: datetime | int = None,
-    endpoint: str = os.getenv("MORIARTY_CONNECTOR_ENDPOINT", "http://moriarty-connector:8901"),
+    endpoint: str = os.getenv(MORIARTY_CONNECTOR_ENDPOINT_ENV, "http://moriarty-connector:8901"),
     *,
     async_client=httpx.AsyncClient,
     **client_kwargs,

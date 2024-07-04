@@ -37,7 +37,7 @@ def callback(host, port):
 @click.command()
 @click.option("--host", type=click.STRING, default="0.0.0.0")
 @click.option("--port", type=click.INT, default=8902)
-def callback(host, port):
+def api(host, port):
     """
     Start the server.
     """
@@ -64,6 +64,10 @@ async def bridge():
 
 @click.command()
 def init():
+    """
+    Init and upgrade the database.
+    """
+
     config = get_config()
 
     upgrade_in_place(
@@ -96,6 +100,7 @@ def cli():
 
 cli.add_command(init)
 cli.add_command(bridge)
+cli.add_command(api)
 cli.add_command(autoscale)
 cli.add_command(callback)
 # cli.add_command(drop) # noqa: not visible in CLI

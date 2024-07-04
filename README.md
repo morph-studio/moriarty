@@ -73,5 +73,5 @@ pip install -e .[test]
 Run tests with pytest
 
 ```
-pytest -v
+pytest -v tests/
 ```

@@ -8,16 +8,19 @@ import pytest
 import redis
 from click.testing import CliRunner
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, exc, select, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import docker
 from moriarty import mock
+from moriarty.matrix.job_manager.bridge.manager import BridgeManager
+from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper
 from moriarty.matrix.operator_.callback_app import app as APP
 from moriarty.matrix.operator_.cli import drop, init
-from moriarty.matrix.operator_.spawner.manager import (
-    SpawnerManager,
-    get_spawner_manager,
-)
+from moriarty.matrix.operator_.config import get_config
+from moriarty.matrix.operator_.dbutils import get_db_url
+from moriarty.matrix.operator_.operator_ import Bridger
+from moriarty.matrix.operator_.spawner.manager import SpawnerManager
 
 if TYPE_CHECKING:
     from docker import DockerClient
@@ -118,3 +121,74 @@ def pg_port(docker_client: DockerClient):
     finally:
         if container:
             container.stop()
+
+
+@pytest.fixture
+def spawner_manager():
+    spawner_manager = SpawnerManager()
+    spawner_manager._load_dir(mock)
+
+    yield spawner_manager
+
+
+@pytest.fixture
+def bridge_manager():
+    bridge_manager = BridgeManager()
+    bridge_manager._load_dir(mock)
+
+    yield bridge_manager
+
+
+@pytest.fixture
+async def async_redis_client(redis_port, monkeypatch):
+    monkeypatch.setenv("REDIS_PORT", str(redis_port))
+    _config = get_config()
+
+    redis_url = _config.redis.get_redis_url()
+    if _config.redis.cluster:
+        redis_client = redis.asyncio.RedisCluster.from_url(redis_url, decode_responses=True)
+    else:
+        redis_client = redis.asyncio.from_url(redis_url, decode_responses=True)
+    try:
+        yield redis_client
+    finally:
+        await redis_client.aclose()
+
+
+@pytest.fixture
+async def async_session(pg_port, monkeypatch):
+    monkeypatch.setenv("DB_PORT", str(pg_port))
+    _config = get_config()
+    engine = create_async_engine(get_db_url(_config, async_mode=True))
+    factory = async_sessionmaker(engine)
+    async with factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except exc.SQLAlchemyError as error:
+            await session.rollback()
+            raise
+
+
+@pytest.fixture
+def bridge_wrapper(bridge_manager):
+    return BridgeWrapper(bridge_manager)
+
+
+@pytest.fixture
+async def bridger(
+    spawner_manager: SpawnerManager,
+    async_redis_client: redis.asyncio.Redis,
+    async_session: AsyncSession,
+    bridge_wrapper: BridgeWrapper,
+):
+    spawner = spawner_manager.init("mock")
+    await spawner.prepare()
+
+    return Bridger(
+        spawner=spawner,
+        bridge_name="mock",
+        bridge_wrapper=bridge_wrapper,
+        redis_client=async_redis_client,
+        session=async_session,
+    )
