@@ -102,10 +102,12 @@ class Bridger(EndpointMixin):
             await self.bridge_one(endpoint_name)
 
     async def has_capacity(self, endpoint_name: str) -> bool:
-        unfinished_count = await self.job_producer.count_unfinished_jobs(endpoint_name)
         endpoint_orm = await self.get_endpoint_orm(endpoint_name)
         if endpoint_orm is None:
+            logger.warning(f"Endpoint not found: {endpoint_name}, may be deleted?")
             return False
+
+        unfinished_count = await self.job_producer.count_unfinished_jobs(endpoint_name)
         return unfinished_count < endpoint_orm.queue_capacity
 
     async def bridge_one(self, endpoint_name: str) -> None:
