@@ -30,20 +30,22 @@ class EndpointMixin:
 
     async def get_endpoint_orm(self, endpoint_name: str) -> EndpointORM | None:
         return (
-            await self.session.execute(select(EndpointORM).where(EndpointORM.name == endpoint_name))
+            await self.session.execute(
+                select(EndpointORM).where(EndpointORM.endpoint_name == endpoint_name)
+            )
         ).scalar_one_or_none()
 
     async def get_avaliable_endpoints(self) -> list[str]:
-        orms = (
+        endpoint_names = (
             (
                 await self.session.execute(
-                    select(EndpointORM.name).where(EndpointORM.available == True)
+                    select(EndpointORM.endpoint_name).where(EndpointORM.available == True)
                 )
             )
             .scalars()
             .all()
         )
-        return [orm.endpoint_name for orm in orms]
+        return endpoint_names
 
 
 def get_bridger(

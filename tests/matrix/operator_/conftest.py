@@ -171,24 +171,24 @@ async def async_session(pg_port, monkeypatch):
 
 
 @pytest.fixture
+def bridge_wrapper(bridge_manager):
+    return BridgeWrapper(bridge_manager)
+
+
+@pytest.fixture
 async def bridger(
     spawner_manager: SpawnerManager,
-    bridge_manager: BridgeManager,
     async_redis_client: redis.asyncio.Redis,
     async_session: AsyncSession,
+    bridge_wrapper: BridgeWrapper,
 ):
     spawner = spawner_manager.init("mock")
     await spawner.prepare()
 
-    yield Bridger(
+    return Bridger(
         spawner=spawner,
         bridge_name="mock",
-        bridge_wrapper=BridgeWrapper(bridge_manager),
+        bridge_wrapper=bridge_wrapper,
         redis_client=async_redis_client,
         session=async_session,
     )
-
-
-@pytest.fixture
-def bridge_wrapper(bridge_manager):
-    return BridgeWrapper(bridge_manager)
