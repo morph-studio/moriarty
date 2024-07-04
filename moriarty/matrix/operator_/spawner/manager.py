@@ -11,11 +11,8 @@ from fastapi import Depends
 
 from moriarty.exceptions import PluginInitializationError, PluginNotFoundError
 from moriarty.log import logger
+from moriarty.matrix.envs import get_spawner_name
 from moriarty.matrix.operator_.spawner import impl, plugin
-
-
-def get_spawner_name() -> str:
-    return os.getenv("MORIARTY_SPAWNER_NAME", "kube")
 
 
 def get_spawner_manager() -> SpawnerManager:
