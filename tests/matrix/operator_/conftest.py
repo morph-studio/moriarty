@@ -10,6 +10,7 @@ from click.testing import CliRunner
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, exc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 import docker
 from moriarty import mock
@@ -171,22 +172,32 @@ async def async_session(pg_port, monkeypatch):
 
 
 @pytest.fixture
+def session(pg_port, monkeypatch):
+    monkeypatch.setenv("DB_PORT", str(pg_port))
+    _config = get_config()
+    engine = create_engine(get_db_url(_config, async_mode=False))
+    factory = sessionmaker(engine)
+    with factory() as session:
+        try:
+            yield session
+            session.commit()
+        except exc.SQLAlchemyError as error:
+            session.rollback()
+            raise
+
+
+@pytest.fixture
 def bridge_wrapper(bridge_manager):
     return BridgeWrapper(bridge_manager)
 
 
 @pytest.fixture
 async def bridger(
-    spawner_manager: SpawnerManager,
     async_redis_client: redis.asyncio.Redis,
     async_session: AsyncSession,
     bridge_wrapper: BridgeWrapper,
 ):
-    spawner = spawner_manager.init("mock")
-    await spawner.prepare()
-
     return Bridger(
-        spawner=spawner,
         bridge_name="mock",
         bridge_wrapper=bridge_wrapper,
         redis_client=async_redis_client,

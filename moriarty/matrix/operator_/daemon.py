@@ -6,7 +6,7 @@ import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
-from moriarty.matrix.connector.invoker import get_bridge_name
+from moriarty.matrix.envs import get_bridge_name
 from moriarty.matrix.job_manager.bridge_wrapper import (
     get_bridge_manager,
     get_bridge_wrapper,
@@ -142,21 +142,12 @@ class BridgeDaemon(DaemonMixin):
         self.bridge_wrapper = get_bridge_wrapper(bridge_manager=get_bridge_manager())
         self.config = config
 
-        self._spawner: Spawner | None = None
-
-    async def initialize(self):
-        self._spawner = await get_spawner(
-            spawner_name=get_spawner_name(),
-            spawner_manager=get_spawner_manager(),
-        )
-
     async def run(self):
         logger.debug(f"Triggering bridge...")
 
         async with open_redis_client(self.config) as redis_client:
             async with open_db_session(self.config) as session:
                 bridger = Bridger(
-                    spawner=self._spawner,
                     bridge_name=self.bridge_name,
                     bridge_wrapper=self.bridge_wrapper,
                     redis_client=redis_client,

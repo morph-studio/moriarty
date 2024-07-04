@@ -5,13 +5,14 @@ from functools import cached_property
 
 import redis.asyncio as redis
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
 from moriarty.matrix.connector.invoker import get_bridge_name
+from moriarty.matrix.envs import get_bridge_result_queue_url
 from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper, get_bridge_wrapper
-from moriarty.matrix.job_manager.params import InferenceJob
+from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
 from moriarty.matrix.operator_.autoscaler import (
     AutoscalerManager,
     get_autoscaler_manager,
@@ -49,18 +50,18 @@ class EndpointMixin:
 
 
 def get_bridger(
-    spawner: plugin.Spawner = Depends(get_spawner),
     bridge_name: str = Depends(get_bridge_name),
     bridge_wrapper: BridgeWrapper = Depends(get_bridge_wrapper),
     redis_client: redis.Redis | redis.RedisCluster = Depends(get_redis_client),
     session: AsyncSession = Depends(get_db_session),
+    bridge_result_queue_url: str = Depends(get_bridge_result_queue_url),
 ) -> Bridger:
     return Bridger(
-        spawner=spawner,
         bridge_name=bridge_name,
         bridge_wrapper=bridge_wrapper,
         redis_client=redis_client,
         session=session,
+        bridge_result_queue_url=bridge_result_queue_url,
     )
 
 
@@ -83,17 +84,17 @@ async def get_operaotr(
 class Bridger(EndpointMixin):
     def __init__(
         self,
-        spawner: plugin.Spawner,
         bridge_name: str,
         bridge_wrapper: BridgeWrapper,
         redis_client: redis.Redis | redis.RedisCluster,
         session: AsyncSession,
+        bridge_result_queue_url: None | str = None,
     ) -> None:
-        self.spawner = spawner
         self.bridge_name = bridge_name
         self.bridge_wrapper = bridge_wrapper
         self.redis_client = redis_client
         self.session = session
+        self.bridge_result_queue_url = bridge_result_queue_url
 
     @cached_property
     def job_producer(self) -> JobProducer:
@@ -118,6 +119,13 @@ class Bridger(EndpointMixin):
                 endpoint_name,
                 params=job.payload,
             )
+            log_orm = InferenceLogORM(
+                inference_id=job.inference_id,
+                endpoint_name=endpoint_name,
+                inference_job=job.model_dump(),
+            )
+            self.session.add(log_orm)
+            await self.session.commit()
 
         logger.info(f"Bridge endpoint: {endpoint_name}")
         while await self.has_capacity(endpoint_name):
@@ -129,6 +137,13 @@ class Bridger(EndpointMixin):
             if not sampled_count:
                 return
             logger.debug(f"One job sampled -> {endpoint_name}")
+
+    async def bridge_result(self, callback: MatrixCallback) -> None:
+        await self.bridge_wrapper.enqueue_result(
+            bridge=self.bridge_name,
+            bridge_result_queue_url=self.bridge_result_queue_url,
+            result=InferenceResult.from_proxy_callback(callback),
+        )
 
 
 class Operator:
@@ -146,4 +161,16 @@ class Operator:
         self.redis_client = redis_client
         self.autoscaler_manager = autoscaler_manager
 
-    async def handle_callback(self, callback: MatrixCallback) -> None: ...
+    async def handle_callback(self, callback: MatrixCallback) -> None:
+        await self.bridger.bridge_result(callback)
+        await self.session.execute(
+            update(InferenceLogORM)
+            .where(InferenceLogORM.inference_id == callback.inference_id)
+            .values(
+                status=callback.status,
+                callback_response=callback.model_dump(),
+                finished_at=func.now(),
+            )
+        )
+        await self.session.commit()
+        logger.info(f"Callback handled: {callback}")

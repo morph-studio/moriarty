@@ -75,10 +75,10 @@ class InferenceLogORM(Base):
     id_ = Column(Integer, autoincrement=True, primary_key=True)
     inference_id = Column(String(255), nullable=False, index=True, default=lambda: uuid.uuid4().hex)
     endpoint_name = Column(String(255), nullable=False, index=True)
-    payload = Column(JSON, nullable=False)
+    inference_job = Column(JSON, nullable=False)
 
     status = Column(String(255), nullable=False, default=InferenceProxyStatus.RUNNING)
-    callback_response = Column(JSON, nullable=False, default={})
+    callback_response = Column(JSON, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, nullable=False, default=func.now())
