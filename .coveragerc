@@ -5,3 +5,4 @@ omit =
     **/cli.py
     **/impl/*
     **/mock/*
+    moriarty/matrix/operator_/daemon.py
