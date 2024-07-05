@@ -109,7 +109,8 @@ async def delete_endpoint(
 async def autoscale_endpoint_info(
     endpointd_name: str,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
-) -> QueryEndpointAutoscaleResponse: ...
+) -> QueryEndpointAutoscaleResponse:
+    return await autoscaler.get_autoscale_info(endpointd_name)
 
 
 @app.post("/autoscale/{endpoint_name}/update")
@@ -117,7 +118,8 @@ async def autoscale_endpoint(
     endpointd_name: str,
     params: SetAutoscaleParams,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
-) -> QueryEndpointAutoscaleResponse: ...
+) -> QueryEndpointAutoscaleResponse:
+    return await autoscaler.update(endpointd_name, params)
 
 
 @app.post("/autoscale/{endpoint_name}/delete")
@@ -125,4 +127,5 @@ async def autoscale_endpoint(
     endpointd_name: str,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> QueryEndpointAutoscaleResponse:
+    await autoscaler.delete(endpointd_name)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

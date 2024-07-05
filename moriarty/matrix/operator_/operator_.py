@@ -5,7 +5,7 @@ from functools import cached_property
 
 import redis.asyncio as redis
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
@@ -18,6 +18,7 @@ from moriarty.matrix.operator_.autoscaler import (
     get_autoscaler_manager,
 )
 from moriarty.matrix.operator_.dbutils import get_db_session
+from moriarty.matrix.operator_.mixin import EndpointMixin
 from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM, InferenceLogORM
 from moriarty.matrix.operator_.params import (
     ContainerScope,
@@ -33,31 +34,6 @@ from moriarty.matrix.operator_.spawner import plugin
 from moriarty.matrix.operator_.spawner.manager import get_spawner
 from moriarty.sidecar.params import MatrixCallback
 from moriarty.sidecar.producer import JobProducer
-
-
-class EndpointMixin:
-    session: AsyncSession
-
-    async def get_endpoint_orm(self, endpoint_name: str) -> EndpointORM | None:
-        return (
-            await self.session.execute(
-                select(EndpointORM).where(EndpointORM.endpoint_name == endpoint_name)
-            )
-        ).scalar_one_or_none()
-
-    async def get_avaliable_endpoints(self) -> list[str]:
-        endpoint_names = (
-            (
-                await self.session.execute(
-                    select(EndpointORM.endpoint_name).where(
-                        EndpointORM.replicas > 0,
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return endpoint_names
 
 
 def get_bridger(
@@ -388,15 +364,12 @@ class Operator:
         return await self.get_endpoint_info(endpoint_orm)
 
     async def delete_endpoint(self, endpoint_name: str) -> None:
-        endpoint_orm = await self.get_endpoint_orm(endpoint_name)
-        if not endpoint_orm:
-            return
-
-        await self.spawner.delete(endpoint_orm)
-
-        await self.session.delete(endpoint_orm)
+        await self.spawner.delete(endpoint_name)
+        await self.session.execute(
+            delete(EndpointORM).where(EndpointORM.endpoint_name == endpoint_name)
+        )
         await self.session.commit()
-        await self.autoscaler_manager.delete(endpoint_orm)
+        await self.autoscaler_manager.delete(endpoint_name)
 
     async def handle_callback(self, callback: MatrixCallback) -> None:
         await self.bridger.bridge_result(callback)

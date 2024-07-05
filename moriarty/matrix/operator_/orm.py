@@ -125,3 +125,24 @@ class AutoscalerORM(Base):
         onupdate=func.now(),
         comment="Updated at",
     )
+
+
+class AutoscaleLogORM(Base):
+    __tablename__ = "moriarty_autoscale_logs"
+
+    id_ = Column(Integer, autoincrement=True, primary_key=True)
+    endpoint_name = Column(String(255), nullable=False, index=True)
+    old_replicas = Column(Integer, nullable=False)
+    new_replicas = Column(Integer, nullable=False)
+    metrics = Column(String, nullable=False)
+    metrics_threshold = Column(Float, nullable=False)
+    metrics_value = Column(Float, nullable=False)
+    details = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+        comment="Updated at",
+    )
