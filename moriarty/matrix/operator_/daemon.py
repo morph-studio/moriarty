@@ -141,6 +141,13 @@ class BridgeDaemon(DaemonMixin):
         self.bridge_name = get_bridge_name()
         self.bridge_wrapper = get_bridge_wrapper(bridge_manager=get_bridge_manager())
         self.config = config
+        self.spawner: Spawner = None
+
+    async def initialize(self):
+        self.spawner = await get_spawner(
+            spawner_manager=get_spawner_manager(),
+            spawner_name=get_spawner_name(),
+        )
 
     async def run(self):
         logger.debug(f"Triggering bridge...")
@@ -148,6 +155,7 @@ class BridgeDaemon(DaemonMixin):
         async with open_redis_client(self.config) as redis_client:
             async with open_db_session(self.config) as session:
                 bridger = Bridger(
+                    spawner=self.spawner,
                     bridge_name=self.bridge_name,
                     bridge_wrapper=self.bridge_wrapper,
                     redis_client=redis_client,

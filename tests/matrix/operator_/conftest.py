@@ -16,12 +16,11 @@ import docker
 from moriarty import mock
 from moriarty.matrix.job_manager.bridge.manager import BridgeManager
 from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper
-from moriarty.matrix.operator_.callback_app import app as APP
 from moriarty.matrix.operator_.cli import drop, init
 from moriarty.matrix.operator_.config import get_config
 from moriarty.matrix.operator_.dbutils import get_db_url
 from moriarty.matrix.operator_.operator_ import Bridger
-from moriarty.matrix.operator_.spawner.manager import SpawnerManager
+from moriarty.matrix.operator_.spawner.manager import SpawnerManager, get_spawner
 
 if TYPE_CHECKING:
     from docker import DockerClient
@@ -32,14 +31,6 @@ def get_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
-
-
-@pytest.fixture
-def spawner_manager():
-    spawner_manager = SpawnerManager()
-    spawner_manager._load_dir(mock)
-
-    yield spawner_manager
 
 
 @pytest.fixture(scope="session")
@@ -193,11 +184,16 @@ def bridge_wrapper(bridge_manager):
 
 @pytest.fixture
 async def bridger(
+    spawner_manager,
     async_redis_client: redis.asyncio.Redis,
     async_session: AsyncSession,
     bridge_wrapper: BridgeWrapper,
 ):
     return Bridger(
+        spawner=await get_spawner(
+            spawner_name="mock",
+            spawner_manager=spawner_manager,
+        ),
         bridge_name="mock",
         bridge_wrapper=bridge_wrapper,
         redis_client=async_redis_client,

@@ -62,3 +62,6 @@ class Spawner:
 
     async def prepare(self) -> None:
         pass
+
+    async def count_avaliable_instances(self, endpoint_name: str) -> int:
+        raise NotImplementedError

@@ -25,6 +25,7 @@ async def get_spawner(
 ) -> plugin.Spawner:
     spawner = spawner_manager.init(spawner_name)
     await spawner.prepare()
+    return spawner
 
 
 class SpawnerManager:

@@ -22,8 +22,8 @@ class JobProducer:
         logger.debug(f"Invoke endpoint: {endpoint_name}")
         return await self.producer.run_job(endpoint_name, kwargs={"payload": params})
 
-    async def count_unfinished_jobs(self, endpoint_name: str) -> int:
-        return await self.producer.count_unacked_jobs(endpoint_name, group_name=self.GROUP_NAME)
+    async def count_unprocessed_jobs(self, endpoint_name: str) -> int:
+        return await self.producer.count_unprocessed_jobs(endpoint_name, group_name=self.GROUP_NAME)
 
     async def count_jobs(self, endpoint_name: str) -> int:
         return await self.producer.count_stream(endpoint_name)
