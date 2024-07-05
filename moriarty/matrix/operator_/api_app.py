@@ -15,9 +15,9 @@ from moriarty.matrix.operator_.params import (
     ListEndpointsResponse,
     QueryEndpointAutoscaleResponse,
     QueryEndpointResponse,
+    SetAutoscaleParams,
     UpdateEndpointParams,
 )
-from moriarty.sidecar.params import MatrixCallback
 
 TOKEN = os.getenv(MORIARTY_MATRIX_TOKEN_ENV)
 
@@ -52,6 +52,24 @@ async def root():
     return {"message": "Hello World"}
 
 
+@app.get("/endpoint/list")
+async def list_endpoints(
+    limit: int = Query(100, ge=1, le=1000),
+    cursor: str | None = None,
+    keyword: str | None = None,
+    orderBy: str = Query("created_at", regex="^(name|created_at|updated_at)$"),
+    order: str = Query("desc", regex="^(asc|desc)$"),
+    operator: Operator = Depends(get_operaotr),
+) -> ListEndpointsResponse:
+    return await operator.list_endpoints(
+        limit=limit,
+        cursor=cursor,
+        keyword=keyword,
+        order_by=orderBy,
+        order=order,
+    )
+
+
 @app.post("/endpoint/create")
 async def create_endpoint(
     params: CreateEndpointParams,
@@ -61,22 +79,12 @@ async def create_endpoint(
     return Response(status_code=status.HTTP_201_CREATED)
 
 
-@app.get("/endpoint/list")
-async def list_endpoints(
-    limit: int = Query(100, ge=1, le=1000),
-    cursor: str | None = None,
-    keyword: str | None = None,
-    order_by: str = Query("created_at", regex="^(name|created_at|updated_at)$"),
-    order: str = Query("desc", regex="^(asc|desc)$"),
-    operator: Operator = Depends(get_operaotr),
-) -> ListEndpointsResponse: ...
-
-
 @app.get("/endpoint/{endpoint_name}/info")
 async def get_endpoint_info(
     endpointd_name: str,
     operator: Operator = Depends(get_operaotr),
-) -> QueryEndpointResponse: ...
+) -> QueryEndpointResponse:
+    return await operator.get_endpoint_info(endpointd_name)
 
 
 @app.post("/endpoint/{endpoint_name}/update")
@@ -84,7 +92,8 @@ async def update_endpoint(
     endpointd_name: str,
     params: UpdateEndpointParams,
     operator: Operator = Depends(get_operaotr),
-) -> QueryEndpointResponse: ...
+) -> QueryEndpointResponse:
+    return await operator.update_endpoint(endpointd_name, params)
 
 
 @app.post("/endpoint/{endpointd_name}/delete")
@@ -92,7 +101,7 @@ async def delete_endpoint(
     endpointd_name: str,
     operator: Operator = Depends(get_operaotr),
 ):
-    # await operator.delete_endpoint(endpointd_name)
+    await operator.delete_endpoint(endpointd_name)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -106,6 +115,7 @@ async def autoscale_endpoint_info(
 @app.post("/autoscale/{endpoint_name}/update")
 async def autoscale_endpoint(
     endpointd_name: str,
+    params: SetAutoscaleParams,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> QueryEndpointAutoscaleResponse: ...
 

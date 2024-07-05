@@ -30,7 +30,7 @@ class InferencerConsumer:
         invoke_host: str = "localhost",
         invoke_port: int = "8080",
         invoke_path: str = "/invocations",
-        health_check_url: str = "/ping",
+        health_check_path: str = "/ping",
         callbacl_url: str = "http://moriarty-operator:8999/api/callback",
         enable_retry: bool = False,
         enable_ssl: bool = False,
@@ -48,7 +48,7 @@ class InferencerConsumer:
         scheme = "https" if enable_ssl else "http"
         proxy_url = f"{scheme}://{invoke_host}:{invoke_port}"
         self.invoke_url = urljoin(proxy_url, invoke_path)
-        self.health_check_url = urljoin(proxy_url, health_check_url)
+        self.health_check_path = urljoin(proxy_url, health_check_path)
         self.callback_url = callbacl_url
 
         self._consumer_builder = partial(
@@ -126,9 +126,9 @@ class InferencerConsumer:
         async with httpx.AsyncClient() as client:
             while True:
                 try:
-                    await client.get(self.health_check_url, timeout=60)
-                    logger.debug(f"Ping {self.health_check_url} succeeded")
+                    await client.get(self.health_check_path, timeout=60)
+                    logger.debug(f"Ping {self.health_check_path} succeeded")
                     break
                 except httpx.ConnectError as e:
-                    logger.debug(f"Ping {self.health_check_url} failed: {e}")
+                    logger.debug(f"Ping {self.health_check_path} failed: {e}")
                     await asyncio.sleep(self.healthy_check_interval)

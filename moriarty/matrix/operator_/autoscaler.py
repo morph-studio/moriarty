@@ -32,3 +32,6 @@ class AutoscalerManager:
 
     async def scan_and_update(self) -> None:
         pass
+
+    async def delete(self, endpoint_name: str) -> None:
+        pass

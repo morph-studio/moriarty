@@ -43,36 +43,40 @@ class EndpointORM(Base):
         comment="Updated at",
     )
     queue_capacity = Column(Integer, nullable=False, default=5)
-    available = Column(Boolean, nullable=False, default=True)
-
-    # Container spec
     image = Column(String(255), nullable=True)
+    model_path = Column(
+        Text,
+        nullable=True,
+        comment="Model path for init container to download from",
+    )
     replicas = Column(
         Integer,
         nullable=False,
         default=1,
-        comment="Number of replicas, if autoscaling not enabled.",
+        comment="Number of replicas, autoscaler will also change it if enabled",
     )
-    cpu_request = Column(Float, nullable=False, default=0.1)
-    cpu_limit = Column(Float, nullable=False, default=0.1)
-    memory_request = Column(Float, nullable=False, default=128.0)
-    memory_limit = Column(Float, nullable=False, default=128.0)
-    gpu = Column(Integer, nullable=False, default=0)
-    gpu_request = Column(Float, nullable=False, default=0.1)
+
+    # Resource spec
+    cpu_request = Column(Float, nullable=False, default=0.1, comment="CPU request in milli")
+    cpu_limit = Column(Float, nullable=True, comment="CPU limit in milli")
+    memory_request = Column(Float, nullable=False, default=128.0, comment="Memory request in MB")
+    memory_limit = Column(Float, nullable=True, comment="Memory limit in MB")
+    gpu_nums = Column(Integer, nullable=False, default=0)
+
+    # Config for container
     environment_variables = Column(JSON, nullable=False, default={})
     environment_variables_secret_refs = Column(JSON, nullable=False, default=[])
-    command = Column(JSON, nullable=False, default=[])
+    commands = Column(JSON, nullable=False, default=[])
     args = Column(JSON, nullable=False, default=[])
+    invoke_port = Column(Integer, nullable=False, default=8080)
+    invoke_path = Column(String(255), nullable=False, default="/invocations")
+    health_check_path = Column(String(255), nullable=False, default="/ping")
 
     # Schedule
     node_labels = Column(JSON, nullable=False, default={})
     node_affinity = Column(JSON, nullable=False, default={})
 
     # Config for sidecar
-    invoke_port = Column(Integer, nullable=False, default=8080)
-    invoke_path = Column(String(255), nullable=False, default="/invocations")
-    health_check_url = Column(String(255), nullable=False, default="/ping")
-    callback_token = Column(String(255), nullable=False, default=lambda: token_urlsafe(16))
     concurrency = Column(Integer, nullable=False, default=1)
     process_timeout = Column(Integer, nullable=False, default=3600)
     healthy_check_timeout = Column(Integer, nullable=False, default=1200)

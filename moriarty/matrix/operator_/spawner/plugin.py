@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import pluggy
 
+from moriarty.matrix.operator_.orm import EndpointORM
+from moriarty.tools import FlexibleModel
+
 project_name = "moriarty.matrix.spawner"
 """
 The entry-point name of this extension.
@@ -57,6 +60,13 @@ def register(manager):
     """
 
 
+class EndpointRuntimeInfo(FlexibleModel):
+    total_node_nums: int
+    pending_node_nums: int
+    avaliable_node_nums: int
+    error_node_nums: int
+
+
 class Spawner:
     register_name: str
 
@@ -64,4 +74,16 @@ class Spawner:
         pass
 
     async def count_avaliable_instances(self, endpoint_name: str) -> int:
+        raise NotImplementedError
+
+    async def create(self, endpoint_orm: EndpointORM) -> None:
+        raise NotImplementedError
+
+    async def update(self, endpoint_orm: EndpointORM) -> None:
+        raise NotImplementedError
+
+    async def delete(self, endpoint_name: EndpointORM) -> None:
+        raise NotImplementedError
+
+    async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
         raise NotImplementedError
