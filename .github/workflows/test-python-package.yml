@@ -17,6 +17,9 @@ jobs:
         steps:
             - name: Create k8s Kind Cluster
               uses: helm/kind-action@v1
+            - name: Create service account
+              run: |
+                  kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts
             - uses: actions/checkout@v4
             - name: Set up Python ${{ matrix.python-version }}
               uses: actions/setup-python@v5
