@@ -47,13 +47,22 @@ class EndpointORM(Base):
 
     # Container spec
     image = Column(String(255), nullable=True)
-    replicas = Column(Integer, nullable=False, default=1)
+    replicas = Column(
+        Integer,
+        nullable=False,
+        default=1,
+        comment="Number of replicas, if autoscaling not enabled.",
+    )
     cpu_request = Column(Float, nullable=False, default=0.1)
     cpu_limit = Column(Float, nullable=False, default=0.1)
     memory_request = Column(Float, nullable=False, default=128.0)
     memory_limit = Column(Float, nullable=False, default=128.0)
     gpu = Column(Integer, nullable=False, default=0)
     gpu_request = Column(Float, nullable=False, default=0.1)
+    environment_variables = Column(JSON, nullable=False, default={})
+    environment_variables_secret_refs = Column(JSON, nullable=False, default=[])
+    command = Column(JSON, nullable=False, default=[])
+    args = Column(JSON, nullable=False, default=[])
 
     # Schedule
     node_labels = Column(JSON, nullable=False, default={})

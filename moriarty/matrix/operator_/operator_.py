@@ -50,6 +50,7 @@ class EndpointMixin:
 
 
 def get_bridger(
+    spawner: plugin.Spawner = Depends(get_spawner),
     bridge_name: str = Depends(get_bridge_name),
     bridge_wrapper: BridgeWrapper = Depends(get_bridge_wrapper),
     redis_client: redis.Redis | redis.RedisCluster = Depends(get_redis_client),
@@ -57,6 +58,7 @@ def get_bridger(
     bridge_result_queue_url: str = Depends(get_bridge_result_queue_url),
 ) -> Bridger:
     return Bridger(
+        spawner=spawner,
         bridge_name=bridge_name,
         bridge_wrapper=bridge_wrapper,
         redis_client=redis_client,
@@ -84,12 +86,14 @@ async def get_operaotr(
 class Bridger(EndpointMixin):
     def __init__(
         self,
+        spawner: plugin.Spawner,
         bridge_name: str,
         bridge_wrapper: BridgeWrapper,
         redis_client: redis.Redis | redis.RedisCluster,
         session: AsyncSession,
         bridge_result_queue_url: None | str = None,
     ) -> None:
+        self.spawner = spawner
         self.bridge_name = bridge_name
         self.bridge_wrapper = bridge_wrapper
         self.redis_client = redis_client
@@ -109,9 +113,13 @@ class Bridger(EndpointMixin):
         if endpoint_orm is None:
             logger.warning(f"Endpoint not found: {endpoint_name}, may be deleted?")
             return False
-
-        unfinished_count = await self.job_producer.count_unfinished_jobs(endpoint_name)
-        return unfinished_count < endpoint_orm.queue_capacity
+        concurrency = endpoint_orm.concurrency
+        pending_count = await self.job_producer.count_unprocessed_jobs(endpoint_name)
+        return (
+            pending_count
+            < endpoint_orm.queue_capacity
+            + await self.spawner.count_avaliable_instances(endpoint_name) * concurrency
+        )
 
     async def bridge_one(self, endpoint_name: str) -> None:
         async def _warp_produce_job(job: InferenceJob) -> None:
