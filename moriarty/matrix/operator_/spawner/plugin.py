@@ -82,8 +82,11 @@ class Spawner:
     async def update(self, endpoint_orm: EndpointORM) -> None:
         raise NotImplementedError
 
-    async def delete(self, endpoint_name: EndpointORM) -> None:
+    async def delete(self, endpoint_name: str) -> None:
         raise NotImplementedError
 
     async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
+        raise NotImplementedError
+
+    async def scale(self, endpoint_name: str, target_replicas: int) -> None:
         raise NotImplementedError

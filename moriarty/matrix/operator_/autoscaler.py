@@ -4,6 +4,7 @@ from functools import cached_property
 
 import redis.asyncio as redis
 from fastapi import Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,7 +29,25 @@ def get_autoscaler_manager(
     return AutoscalerManager(redis_client=redis_client, session=session, spawner=spawner)
 
 
-class AutoscalerManager:
+class EndpointMetrics(BaseModel):
+    endpoint_name: str
+
+
+class MetricsMixin:
+    spawner: plugin.Spawner
+    redis_client: redis.Redis | redis.RedisCluster
+
+    @cached_property
+    def job_producer(self) -> JobProducer:
+        return JobProducer(redis_client=self.redis_client)
+
+    async def get_metrics(self, endpoint_name: str) -> EndpointMetrics:
+        return EndpointMetrics(
+            endpoint_name=endpoint_name,
+        )
+
+
+class AutoscalerManager(MetricsMixin):
     def __init__(
         self,
         redis_client: redis.Redis | redis.RedisCluster,
@@ -38,10 +57,6 @@ class AutoscalerManager:
         self.redis_client = redis_client
         self.session = session
         self.spawner = spawner
-
-    @cached_property
-    def job_producer(self) -> JobProducer:
-        return JobProducer(redis_client=self.redis_client)
 
     async def _clean_not_exist_endpoint(self) -> None:
         await self.session.execute(
@@ -54,13 +69,45 @@ class AutoscalerManager:
 
     async def _scale(self, endpoint_name: str) -> None:
         autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
-        if autoscaler_orm is None:
+        if not autoscaler_orm:
+            logger.warning(f"Autoscaler not found: {endpoint_name}, may be deleted?")
             return
-        # TODO: Scale accroding metrics and log it into AutoscaleLogORM
+
+        metrics = await self.get_metrics(endpoint_name)
+        target_replicas = await self._calculate_target_replicas(metrics, endpoint_name)
+        if await self._is_cooldown(endpoint_name, target_replicas):
+            return
+
+        await self.spawner.scale(endpoint_name, target_replicas)
+        await self._log_scale(self, endpoint_name, metrics, target_replicas)
+
+    async def _log_scale(
+        self, endpoint_name: str, metrics: EndpointMetrics, target_replicas: int
+    ) -> None:
+        pass
+
+    async def _is_cooldown(self, endpoint_name: str, target_replicas: int) -> bool:
+        pass
+
+    async def _calculate_target_replicas(self, current_metrics, endpoint_name) -> int:
+        pass
+
+    async def get_scaleable_endpoints(self) -> list[str]:
+        return (
+            (
+                await self.session.execute(
+                    select(EndpointORM.endpoint_name).where(
+                        EndpointORM.endpoint_name.in_(select(AutoscalerORM.endpoint_name))
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     async def scan_and_scale(self) -> None:
         await self._clean_not_exist_endpoint()
-        for endpoint in await self.get_avaliable_endpoints():
+        for endpoint in await self.get_scaleable_endpoints():
             await self._scale(endpoint)
 
     async def get_autoscaler_orm(self, endpoint_name: str) -> AutoscalerORM | None:
