@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import cached_property
+
 import redis.asyncio as redis
 from fastapi import Depends, HTTPException, status
 from sqlalchemy import delete, select, update
@@ -7,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
 from moriarty.matrix.operator_.dbutils import get_db_session
-from moriarty.matrix.operator_.mixin import EndpointMixin
 from moriarty.matrix.operator_.orm import AutoscaleLogORM, AutoscalerORM, EndpointORM
 from moriarty.matrix.operator_.params import (
     QueryEndpointAutoscaleResponse,
@@ -16,6 +17,7 @@ from moriarty.matrix.operator_.params import (
 from moriarty.matrix.operator_.rds import get_redis_client
 from moriarty.matrix.operator_.spawner import plugin
 from moriarty.matrix.operator_.spawner.manager import get_spawner
+from moriarty.sidecar.producer import JobProducer
 
 
 def get_autoscaler_manager(
@@ -26,7 +28,7 @@ def get_autoscaler_manager(
     return AutoscalerManager(redis_client=redis_client, session=session, spawner=spawner)
 
 
-class AutoscalerManager(EndpointMixin):
+class AutoscalerManager:
     def __init__(
         self,
         redis_client: redis.Redis | redis.RedisCluster,
@@ -36,6 +38,10 @@ class AutoscalerManager(EndpointMixin):
         self.redis_client = redis_client
         self.session = session
         self.spawner = spawner
+
+    @cached_property
+    def job_producer(self) -> JobProducer:
+        return JobProducer(redis_client=self.redis_client)
 
     async def _clean_not_exist_endpoint(self) -> None:
         await self.session.execute(
