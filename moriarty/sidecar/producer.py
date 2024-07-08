@@ -8,6 +8,10 @@ from .vars import GROUP_NAME, REDIS_PREFIX
 
 
 class JobProducer:
+    """
+    A warpper of brq.producer.Producer
+    """
+
     REDIS_PREFIX = REDIS_PREFIX
     GROUP_NAME = GROUP_NAME
 

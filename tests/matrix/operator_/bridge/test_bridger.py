@@ -1,5 +1,6 @@
 import pytest
 from click.testing import CliRunner
+from sqlalchemy import delete
 
 from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper
 from moriarty.matrix.job_manager.params import InferenceJob
@@ -10,20 +11,17 @@ from moriarty.matrix.operator_.orm import EndpointORM
 
 @pytest.fixture
 async def mock_endpoint(async_session):
-    runner = CliRunner()
-    # Drop all before testing
-    result = runner.invoke(drop, ["--yes"])
-    assert result.exit_code == 0
-
     name = "mock"
-
     async_session.add(
         EndpointORM(
             endpoint_name=name,
         )
     )
     await async_session.commit()
-    return name
+    yield name
+
+    async_session.execute(delete(EndpointORM).where(EndpointORM.endpoint_name == name))
+    await async_session.commit()
 
 
 async def test_bridger(bridger: Bridger, bridge_wrapper: BridgeWrapper, mock_endpoint):

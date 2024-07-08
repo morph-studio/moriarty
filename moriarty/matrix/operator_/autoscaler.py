@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import math
 from functools import cached_property
 
 import redis.asyncio as redis
 from fastapi import Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
 from moriarty.matrix.operator_.dbutils import get_db_session
+from moriarty.matrix.operator_.enums_ import MetricType
 from moriarty.matrix.operator_.mixin import AutoscaleMixin, EndpointMixin
 from moriarty.matrix.operator_.orm import AutoscaleLogORM, AutoscalerORM, EndpointORM
 from moriarty.matrix.operator_.params import (
+    AutoscaleLog,
+    QueryEndpointAutoscaleLogResponse,
     QueryEndpointAutoscaleResponse,
     SetAutoscaleParams,
 )
@@ -32,6 +36,7 @@ def get_autoscaler_manager(
 
 class EndpointMetrics(BaseModel):
     endpoint_name: str
+    metrics: dict[MetricType, float] = dict()
 
 
 class MetricsMixin:
@@ -42,11 +47,34 @@ class MetricsMixin:
     def job_producer(self) -> JobProducer:
         return JobProducer(redis_client=self.redis_client)
 
+    async def count_pending_jobs(self, endpoint_name: str) -> int:
+        return await self.job_producer.count_unprocessed_jobs(endpoint_name=endpoint_name)
+
     async def get_metrics(self, endpoint_name: str) -> EndpointMetrics:
-        # TODO: Imp this later
+        unprocessed_count = await self.count_pending_jobs(endpoint_name)
+        replicas = max(1, await self.spawner.count_avaliable_instances(endpoint_name))
         return EndpointMetrics(
             endpoint_name=endpoint_name,
+            metrics={
+                MetricType.pending_jobs: unprocessed_count,
+                MetricType.pending_jobs_per_instance: unprocessed_count / replicas,
+            },
         )
+
+    def calculate_least_replicas(
+        self,
+        metric: MetricType,
+        current_metric_value: float | int,
+        metric_threshold: float,
+    ) -> int:
+        if metric == MetricType.pending_jobs:
+            return int(current_metric_value - int(metric_threshold))
+        if metric == MetricType.pending_jobs_per_instance:
+            if metric_threshold == 0:
+                metric_threshold = 1
+            return math.ceil(current_metric_value / metric_threshold)
+
+        raise NotImplementedError
 
 
 class CooldownMixin(AutoscaleMixin):
@@ -86,6 +114,12 @@ class CooldownMixin(AutoscaleMixin):
         cooldown_key = self.get_cooldown_key(endpoint_name, endpoint_orm.replicas < target_replicas)
         return bool(await self.redis_client.get(cooldown_key))
 
+    async def clear_cooldown(self, endpoint_name: str) -> None:
+        scaleout_key = self.get_cooldown_key(endpoint_name, True)
+        scalein_key = self.get_cooldown_key(endpoint_name, False)
+
+        await self.redis_client.delete(scaleout_key, scalein_key)
+
 
 class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
     def __init__(
@@ -99,13 +133,14 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
         self.spawner = spawner
 
     async def _clean_not_exist_endpoint(self) -> None:
+        logger.debug("Cleaning not exist endpoint...")
         await self.session.execute(
             delete(AutoscalerORM).where(
                 AutoscalerORM.endpoint_name.not_in(select(EndpointORM.endpoint_name))
             )
         )
         await self.session.commit()
-        logger.info("Not exist endpoint cleaned")
+        logger.debug("Cleaned not exist endpoint")
 
     async def _scale(self, endpoint_name: str) -> None:
         autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
@@ -115,17 +150,21 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
 
         metrics = await self.get_metrics(endpoint_name)
         target_replicas = await self._calculate_target_replicas(endpoint_name, metrics)
-        if await self._is_cooldown(endpoint_name, target_replicas):
+        if target_replicas is None or await self._is_cooldown(endpoint_name, target_replicas):
             return
         try:
+            logger.info(
+                f"Scale endpoint `{endpoint_name}` -> {target_replicas}, based on {metrics}"
+            )
             await self.spawner.scale(endpoint_name, target_replicas)
         except Exception as e:
             logger.exception(e)
-            await self._revoke_scale(endpoint_name, metrics, target_replicas)
+            await self._revoke_scale(endpoint_name)
         else:
-            await self._commit_scale(self, endpoint_name, metrics, target_replicas)
+            await self._commit_scale(endpoint_name, metrics, target_replicas)
 
     async def _revoke_scale(self, endpoint_name: str) -> None:
+        logger.info(f"Revoke scale endpoint `{endpoint_name}`")
         endpoint_orm = await self.get_endpoint_orm(endpoint_name)
         if endpoint_orm is None:
             logger.warning(f"Endpoint not found: {endpoint_name}, may be deleted?")
@@ -149,9 +188,10 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
             new_replicas=target_replicas,
             metrics=autoscaler_orm.metrics,
             metrics_threshold=autoscaler_orm.metrics_threshold,
-            metrics_value=metrics.model_dump(),
+            metrics_log=metrics.model_dump(),
         )
         self.session.add(log_orm)
+        await self.session.commit()
         await self.session.execute(
             update(EndpointORM)
             .where(EndpointORM.endpoint_name == endpoint_name)
@@ -165,8 +205,38 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
         endpoint_name: str,
         current_metrics: EndpointMetrics,
     ) -> int:
-        # TODO: Imp this
-        return 1
+        autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
+
+        if not autoscaler_orm:
+            logger.warning(f"Autoscaler not found: {endpoint_name}, may be deleted?")
+            return None
+
+        current_metric = current_metrics.metrics.get(autoscaler_orm.metrics)
+        if current_metric is None:
+            logger.info(
+                f"No metrics found for {autoscaler_orm.endpoint_name}.{autoscaler_orm.metrics}"
+            )
+            return None
+
+        least_replicas = self.calculate_least_replicas(
+            metric=autoscaler_orm.metrics,
+            current_metric_value=current_metric,
+            metric_threshold=autoscaler_orm.metrics_threshold,
+        )
+        logger.info(
+            f"Least replicas calculated for {autoscaler_orm.endpoint_name}({autoscaler_orm.metrics}) is {least_replicas}"
+        )
+        if least_replicas < autoscaler_orm.min_replicas:
+            logger.info(
+                f"Using min replicas {autoscaler_orm.min_replicas} instead of {least_replicas}"
+            )
+            return autoscaler_orm.min_replicas
+        if least_replicas > autoscaler_orm.max_replicas:
+            logger.info(
+                f"Using max replicas {autoscaler_orm.max_replicas} instead of {least_replicas}"
+            )
+            return autoscaler_orm.max_replicas
+        return least_replicas
 
     async def get_scaleable_endpoints(self) -> list[str]:
         return (
@@ -185,6 +255,8 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
         await self._clean_not_exist_endpoint()
         for endpoint in await self.get_scaleable_endpoints():
             await self._scale(endpoint)
+
+        await self.session.commit()
 
     async def get_autoscale_info(self, endpoint_name: str) -> QueryEndpointAutoscaleResponse:
         autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
@@ -230,9 +302,67 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
             )
 
         await self.session.commit()
+        await self.clear_cooldown(endpoint_name)
+
+        logger.info(f"Autoscaler {endpoint_name} updated")
         return await self.get_autoscale_info(endpoint_name)
 
     async def delete(self, endpoint_name: str) -> None:
         await self.session.execute(
             delete(AutoscalerORM).where(AutoscalerORM.endpoint_name == endpoint_name)
+        )
+
+    async def get_autoscale_logs(
+        self,
+        endpoint_name: str,
+        limit: int,
+        cursor: int | None,
+        order_by: str,
+        order: str,
+    ) -> QueryEndpointAutoscaleLogResponse:
+        if cursor:
+            cursor = await self.session.get(AutoscaleLogORM, cursor)
+            if not cursor:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Cursor not found"
+                )
+
+        query = select(AutoscaleLogORM).where(AutoscaleLogORM.endpoint_name == endpoint_name)
+
+        if cursor:
+            query = query.where(AutoscaleLogORM.id_ < cursor.id_)
+
+        if order == "desc":
+            query = query.order_by(getattr(AutoscaleLogORM, order_by).desc())
+
+        else:
+            query = query.order_by(getattr(AutoscaleLogORM, order_by))
+
+        query = query.limit(limit)
+        total = (
+            await self.session.execute(select(func.count(AutoscaleLogORM.endpoint_name)))
+        ).scalar_one()
+        log_orms = (await self.session.execute(query)).scalars().all()
+        next_cursor = log_orms[-1].id_ if log_orms else None
+
+        return QueryEndpointAutoscaleLogResponse(
+            logs=[
+                AutoscaleLog(
+                    id_=log_orm.id_,
+                    endpoint_name=log_orm.endpoint_name,
+                    old_replicas=log_orm.old_replicas,
+                    new_replicas=log_orm.new_replicas,
+                    metrics=log_orm.metrics,
+                    metrics_threshold=log_orm.metrics_threshold,
+                    metrics_log=log_orm.metrics_log,
+                    details=log_orm.details,
+                    created_at=log_orm.created_at,
+                    updated_at=log_orm.updated_at,
+                )
+                for log_orm in log_orms
+                if log_orm
+            ],
+            cursor=next_cursor,
+            limit=limit,
+            total=total,
         )

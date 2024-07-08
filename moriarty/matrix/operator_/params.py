@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Optional
 
-from moriarty.matrix.operator_.enums_ import EndpointMetrics
+from moriarty.matrix.operator_.enums_ import MetricType
 from moriarty.matrix.operator_.spawner.plugin import EndpointRuntimeInfo
 from moriarty.tools import FlexibleModel
 
@@ -88,7 +89,7 @@ class QueryEndpointAutoscaleResponse(FlexibleModel):
     max_replicas: int
     scale_in_cooldown: int
     scale_out_cooldown: int
-    metrics: EndpointMetrics
+    metrics: MetricType
     metrics_threshold: float
 
 
@@ -97,5 +98,25 @@ class SetAutoscaleParams(FlexibleModel):
     max_replicas: Optional[int] = None
     scale_in_cooldown: Optional[int] = None
     scale_out_cooldown: Optional[int] = None
-    metrics: Optional[EndpointMetrics] = None
+    metrics: Optional[MetricType] = None
     metrics_threshold: Optional[float] = None
+
+
+class AutoscaleLog(FlexibleModel):
+    id_: int
+    endpoint_name: str
+    old_replicas: int
+    new_replicas: int
+    metrics: MetricType
+    metrics_threshold: float
+    metrics_log: dict
+    details: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class QueryEndpointAutoscaleLogResponse(FlexibleModel):
+    logs: list[AutoscaleLog]
+    cursor: Optional[int] = None
+    limit: int
+    total: int

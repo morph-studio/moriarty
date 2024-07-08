@@ -1,6 +1,6 @@
 import enum
 
 
-class EndpointMetrics(str, enum.Enum):
-    pendding_jobs = "pendding_jobs"
-    pendding_jobs_per_instance = "pendding_jobs_per_instance"
+class MetricType(str, enum.Enum):
+    pending_jobs = "pending_jobs"
+    pending_jobs_per_instance = "pending_jobs_per_instance"

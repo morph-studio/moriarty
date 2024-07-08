@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import declarative_base
 
-from moriarty.matrix.operator_.enums_ import EndpointMetrics
+from moriarty.matrix.operator_.enums_ import MetricType
 from moriarty.sidecar.params import InferenceProxyStatus
 
 Base = declarative_base()
@@ -114,7 +114,7 @@ class AutoscalerORM(Base):
     scale_in_cooldown = Column(Integer, nullable=False, default=60)
     scale_out_cooldown = Column(Integer, nullable=False, default=60)
 
-    metrics = Column(String, nullable=False, default=EndpointMetrics.pendding_jobs_per_instance)
+    metrics = Column(String, nullable=False, default=MetricType.pending_jobs_per_instance)
     metrics_threshold = Column(Float, nullable=False, default=3)
 
     created_at = Column(DateTime, nullable=False, default=func.now())
@@ -137,7 +137,7 @@ class AutoscaleLogORM(Base):
     metrics = Column(String, nullable=False)
     metrics_threshold = Column(Float, nullable=False)
     metrics_log = Column(JSON, nullable=False)
-    details = Column(String, nullable=False)
+    details = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(
         DateTime,
