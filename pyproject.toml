@@ -37,6 +37,7 @@ service = [
     "fastapi",
     "pluggy",
     "kubernetes_asyncio",
+    "escapism",
     "alembic",
     "jinja2",
 ]
