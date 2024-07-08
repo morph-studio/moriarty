@@ -40,6 +40,9 @@ async def app(pg_port, redis_port, monkeypatch, spawner_manager, bridge_manager)
     }
     yield APP
 
+    result = runner.invoke(drop, ["--yes"])
+    assert result.exit_code == 0
+
 
 @pytest.fixture
 def client(app):

@@ -36,6 +36,8 @@ async def app(pg_port, redis_port, monkeypatch, spawner_manager, bridge_manager)
         get_spawner_name: lambda: "mock",
     }
     yield APP
+    result = runner.invoke(drop, ["--yes"])
+    assert result.exit_code == 0
 
 
 @pytest.fixture

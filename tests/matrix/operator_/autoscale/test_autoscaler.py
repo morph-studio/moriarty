@@ -1,8 +1,9 @@
 import pytest
+from sqlalchemy import delete
 
 from moriarty.matrix.operator_.autoscaler import AutoscalerManager
 from moriarty.matrix.operator_.enums_ import MetricType
-from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM
+from moriarty.matrix.operator_.orm import AutoscaleLogORM, AutoscalerORM, EndpointORM
 
 
 @pytest.fixture
@@ -45,6 +46,15 @@ def scaleable_endpoint(session):
     session.commit()
 
     yield endpoint_name
+
+    session.execute(delete(EndpointORM).where(EndpointORM.endpoint_name == endpoint_name))
+    session.commit()
+
+    session.execute(delete(AutoscalerORM).where(AutoscalerORM.endpoint_name == endpoint_name))
+    session.commit()
+
+    session.execute(delete(AutoscaleLogORM).where(AutoscaleLogORM.endpoint_name == endpoint_name))
+    session.commit()
 
 
 async def test_scan_and_scale(autoscaler: AutoscalerManager, scaleable_endpoint):
