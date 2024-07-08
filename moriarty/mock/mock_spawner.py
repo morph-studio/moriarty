@@ -1,5 +1,10 @@
 from moriarty.log import logger
-from moriarty.matrix.operator_.spawner.plugin import Spawner, hookimpl
+from moriarty.matrix.operator_.orm import EndpointORM
+from moriarty.matrix.operator_.spawner.plugin import (
+    EndpointRuntimeInfo,
+    Spawner,
+    hookimpl,
+)
 
 
 class MockSpawner(Spawner):
@@ -10,6 +15,26 @@ class MockSpawner(Spawner):
 
     async def count_avaliable_instances(self, endpoint_name: str) -> int:
         return 1
+
+    async def create(self, endpoint_orm: EndpointORM) -> None:
+        return None
+
+    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = False) -> None:
+        return None
+
+    async def delete(self, endpoint_name: str) -> None:
+        return None
+
+    async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
+        return EndpointRuntimeInfo(
+            total_node_nums=1,
+            pending_node_nums=0,
+            avaliable_node_nums=1,
+            error_node_nums=0,
+        )
+
+    async def scale(self, endpoint_name: str, target_replicas: int) -> None:
+        return None
 
 
 @hookimpl

@@ -4,8 +4,8 @@ import os
 from functools import cached_property
 
 import redis.asyncio as redis
-from fastapi import Depends
-from sqlalchemy import func, select, update
+from fastapi import Depends, HTTPException, status
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
@@ -18,35 +18,22 @@ from moriarty.matrix.operator_.autoscaler import (
     get_autoscaler_manager,
 )
 from moriarty.matrix.operator_.dbutils import get_db_session
+from moriarty.matrix.operator_.mixin import EndpointMixin
 from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM, InferenceLogORM
+from moriarty.matrix.operator_.params import (
+    ContainerScope,
+    CreateEndpointParams,
+    ListEndpointsResponse,
+    QueryEndpointResponse,
+    ResourceScope,
+    ScheduleScope,
+    UpdateEndpointParams,
+)
 from moriarty.matrix.operator_.rds import get_redis_client
 from moriarty.matrix.operator_.spawner import plugin
 from moriarty.matrix.operator_.spawner.manager import get_spawner
 from moriarty.sidecar.params import MatrixCallback
 from moriarty.sidecar.producer import JobProducer
-
-
-class EndpointMixin:
-    session: AsyncSession
-
-    async def get_endpoint_orm(self, endpoint_name: str) -> EndpointORM | None:
-        return (
-            await self.session.execute(
-                select(EndpointORM).where(EndpointORM.endpoint_name == endpoint_name)
-            )
-        ).scalar_one_or_none()
-
-    async def get_avaliable_endpoints(self) -> list[str]:
-        endpoint_names = (
-            (
-                await self.session.execute(
-                    select(EndpointORM.endpoint_name).where(EndpointORM.available == True)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return endpoint_names
 
 
 def get_bridger(
@@ -168,6 +155,247 @@ class Operator:
         self.session = session
         self.redis_client = redis_client
         self.autoscaler_manager = autoscaler_manager
+
+    async def get_endpoint_orm(self, endpoint_name: str) -> EndpointORM | None:
+        return (
+            await self.session.execute(
+                select(EndpointORM).where(EndpointORM.endpoint_name == endpoint_name)
+            )
+        ).scalar_one_or_none()
+
+    async def get_endpoint_info(self, endpoint: str | EndpointORM) -> QueryEndpointResponse:
+        if isinstance(endpoint, str):
+            endpoint_orm = await self.get_endpoint_orm(endpoint)
+        else:
+            endpoint_orm = endpoint
+
+        if not endpoint_orm:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint not found")
+
+        endpoint_name = endpoint_orm.endpoint_name
+        return QueryEndpointResponse(
+            endpoint_name=endpoint_orm.endpoint_name,
+            image=endpoint_orm.image,
+            model_path=endpoint_orm.model_path,
+            queue_capacity=endpoint_orm.queue_capacity,
+            replicas=endpoint_orm.replicas,
+            resource=ResourceScope(
+                cpu_request=endpoint_orm.cpu_request,
+                cpu_limit=endpoint_orm.cpu_limit,
+                memory_request=endpoint_orm.memory_request,
+                memory_limit=endpoint_orm.memory_limit,
+                gpu_nums=endpoint_orm.gpu_nums,
+            ),
+            schedule=ScheduleScope(
+                node_labels=endpoint_orm.node_labels,
+                node_affinity=endpoint_orm.node_affinity,
+            ),
+            container=ContainerScope(
+                environment_variables=endpoint_orm.environment_variables,
+                environment_variables_secret_refs=endpoint_orm.environment_variables_secret_refs,
+                commands=endpoint_orm.commands,
+                args=endpoint_orm.args,
+                invoke_port=endpoint_orm.invoke_port,
+                invoke_path=endpoint_orm.invoke_path,
+                health_check_path=endpoint_orm.health_check_path,
+            ),
+            runtime=await self.spawner.get_runtime_info(endpoint_name),
+        )
+
+    async def list_endpoints(
+        self,
+        limit: int,
+        cursor: str | None,
+        keyword: str | None,
+        order_by: str,
+        order: str,
+    ) -> ListEndpointsResponse:
+        if cursor:
+            cursor = await self.get_endpoint_orm(cursor)
+            if not cursor:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Cursor not found"
+                )
+
+        query = select(EndpointORM)
+        if keyword:
+            query = query.where(EndpointORM.endpoint_name.contains(keyword))
+
+        if cursor:
+            query = query.where(EndpointORM.id_ < cursor.id_)
+
+        if order == "desc":
+            query = query.order_by(getattr(EndpointORM, order_by).desc())
+
+        else:
+            query = query.order_by(getattr(EndpointORM, order_by))
+
+        query = query.limit(limit)
+        endpoint_orms = (await self.session.execute(query)).scalars().all()
+        next_cursor = endpoint_orms[-1].endpoint_name if endpoint_orms else None
+
+        return ListEndpointsResponse(
+            endpoints=[
+                await self.get_endpoint_info(endpoint_orm) for endpoint_orm in endpoint_orms
+            ],
+            cursor=next_cursor,
+            limit=limit,
+            total=(
+                await self.session.execute(select(func.count(EndpointORM.endpoint_name)))
+            ).scalar_one(),
+        )
+
+    async def create_endpoint(self, params: CreateEndpointParams) -> None:
+        if await self.get_endpoint_orm(params.endpoint_name):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Endpoint already exists"
+            )
+
+        endpoint_orm = EndpointORM(
+            endpoint_name=params.endpoint_name,
+            queue_capacity=params.queue_capacity,
+            image=params.image,
+            model_path=params.model_path,
+            replicas=params.replicas,
+            **{
+                k: v
+                for k, v in dict(
+                    cpu_request=params.resource.cpu_request,
+                    cpu_limit=params.resource.cpu_limit,
+                    memory_request=params.resource.memory_request,
+                    memory_limit=params.resource.memory_limit,
+                    gpu_nums=params.resource.gpu_nums,
+                ).items()
+                if v is not None
+            },
+            **{
+                k: v
+                for k, v in dict(
+                    environment_variables=params.container.environment_variables,
+                    environment_variables_secret_refs=params.container.environment_variables_secret_refs,
+                    commands=params.container.commands,
+                    args=params.container.args,
+                    invoke_port=params.container.invoke_port,
+                    invoke_path=params.container.invoke_path,
+                    health_check_path=params.container.health_check_path,
+                ).items()
+                if v is not None
+            },
+            **{
+                k: v
+                for k, v in dict(
+                    node_labels=params.schedule.node_labels,
+                    node_affinity=params.schedule.node_affinity,
+                ).items()
+                if v is not None
+            },
+            **{
+                k: v
+                for k, v in dict(
+                    concurrency=params.sidecar.concurrency,
+                    process_timeout=params.sidecar.process_timeout,
+                    healthy_check_timeout=params.sidecar.healthy_check_timeout,
+                    healthy_check_interval=params.sidecar.healthy_check_interval,
+                ).items()
+                if v is not None
+            },
+        )
+        self.session.add(endpoint_orm)
+        await self.session.commit()
+        await self.session.refresh(endpoint_orm)
+        await self.spawner.create(endpoint_orm)
+
+    async def update_endpoint(self, endpoint_name: str, params: UpdateEndpointParams) -> None:
+        endpoint_orm = await self.get_endpoint_orm(endpoint_name)
+        if not endpoint_orm:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint not found")
+
+        await self.session.execute(
+            update(EndpointORM)
+            .where(EndpointORM.endpoint_name == endpoint_name)
+            .values(
+                **{
+                    k: v
+                    for k, v in dict(
+                        queue_capacity=params.queue_capacity,
+                        image=params.image,
+                        model_path=params.model_path,
+                        replicas=params.replicas,
+                    ).items()
+                    if v is not None
+                },
+                **(
+                    {
+                        k: v
+                        for k, v in dict(
+                            cpu_request=params.resource.cpu_request,
+                            cpu_limit=params.resource.cpu_limit,
+                            memory_request=params.resource.memory_request,
+                            memory_limit=params.resource.memory_limit,
+                            gpu_nums=params.resource.gpu_nums,
+                        ).items()
+                        if v is not None
+                    }
+                    if params.resource is not None
+                    else {}
+                ),
+                **(
+                    {
+                        k: v
+                        for k, v in dict(
+                            environment_variables=params.container.environment_variables,
+                            environment_variables_secret_refs=params.container.environment_variables_secret_refs,
+                            commands=params.container.commands,
+                            args=params.container.args,
+                            invoke_port=params.container.invoke_port,
+                            invoke_path=params.container.invoke_path,
+                            health_check_path=params.container.health_check_path,
+                        ).items()
+                        if v is not None
+                    }
+                    if params.container is not None
+                    else {}
+                ),
+                **(
+                    {
+                        k: v
+                        for k, v in dict(
+                            node_labels=params.schedule.node_labels,
+                            node_affinity=params.schedule.node_affinity,
+                        ).items()
+                        if v is not None
+                    }
+                    if params.schedule is not None
+                    else {}
+                ),
+                **(
+                    {
+                        k: v
+                        for k, v in dict(
+                            concurrency=params.sidecar.concurrency,
+                            process_timeout=params.sidecar.process_timeout,
+                            healthy_check_timeout=params.sidecar.healthy_check_timeout,
+                            healthy_check_interval=params.sidecar.healthy_check_interval,
+                        ).items()
+                        if v is not None
+                    }
+                    if params.schedule is not None
+                    else {}
+                ),
+            )
+        )
+        await self.session.commit()
+        await self.session.refresh(endpoint_orm)
+        await self.spawner.update(endpoint_orm, need_restart=params.need_restart)
+        return await self.get_endpoint_info(endpoint_orm)
+
+    async def delete_endpoint(self, endpoint_name: str) -> None:
+        await self.spawner.delete(endpoint_name)
+        await self.session.execute(
+            delete(EndpointORM).where(EndpointORM.endpoint_name == endpoint_name)
+        )
+        await self.session.commit()
+        await self.autoscaler_manager.delete(endpoint_name)
 
     async def handle_callback(self, callback: MatrixCallback) -> None:
         await self.bridger.bridge_result(callback)

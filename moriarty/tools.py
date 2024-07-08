@@ -7,6 +7,8 @@ import random
 from functools import wraps
 
 import anyio
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 
 
 def coro(f):
@@ -36,3 +38,15 @@ def sample_as_weights(available_priorities: list[int]) -> int:
     weights = [p / total for p in available_priorities]
     chosen_priority = random.choices(available_priorities, weights)[0]
     return chosen_priority
+
+
+class FlexibleModel(BaseModel):
+    """
+    This allow us provide camel and snake case in the same time
+    """
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        from_attributes=True,
+    )

@@ -13,18 +13,9 @@ from moriarty.matrix.job_manager.bridge_wrapper import get_bridge_manager
 from moriarty.matrix.operator_.api_app import app as APP
 from moriarty.matrix.operator_.cli import drop
 from moriarty.matrix.operator_.spawner.manager import (
-    SpawnerManager,
     get_spawner_manager,
     get_spawner_name,
 )
-
-
-@pytest.fixture
-def spawner_manager():
-    spawner_manager = SpawnerManager()
-    spawner_manager._load_dir(mock)
-
-    yield spawner_manager
 
 
 @pytest.fixture

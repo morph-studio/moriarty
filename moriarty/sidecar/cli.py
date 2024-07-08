@@ -91,7 +91,7 @@ from .envs import *
     required=False,
     help="Health check url",
     type=str,
-    envvar=HEALTH_CHECK_URL_ENV,
+    envvar=HEALTH_CHECK_PATH_ENV,
 )
 @click.option(
     "--enable-retry",
@@ -149,7 +149,7 @@ async def start(
     invoke_host,
     invoke_port,
     invoke_path,
-    health_check_url,
+    health_check_path,
     enable_retry,
     enable_ssl,
     concurrency,
@@ -175,7 +175,7 @@ async def start(
             "invoke_host": invoke_host,
             "invoke_port": invoke_port,
             "invoke_path": invoke_path,
-            "health_check_url": health_check_url,
+            "health_check_path": health_check_path,
             "enable_retry": enable_retry,
             "enable_ssl": enable_ssl,
             "concurrency": concurrency,

@@ -183,17 +183,22 @@ def bridge_wrapper(bridge_manager):
 
 
 @pytest.fixture
+async def spawner(spawner_manager):
+    return await get_spawner(
+        spawner_name="mock",
+        spawner_manager=spawner_manager,
+    )
+
+
+@pytest.fixture
 async def bridger(
-    spawner_manager,
+    spawner,
     async_redis_client: redis.asyncio.Redis,
     async_session: AsyncSession,
     bridge_wrapper: BridgeWrapper,
 ):
     return Bridger(
-        spawner=await get_spawner(
-            spawner_name="mock",
-            spawner_manager=spawner_manager,
-        ),
+        spawner=spawner,
         bridge_name="mock",
         bridge_wrapper=bridge_wrapper,
         redis_client=async_redis_client,
