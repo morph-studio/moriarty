@@ -45,6 +45,7 @@ class CreateEndpointParams(FlexibleModel):
     resource: Optional[ResourceScope] = ResourceScope()
     schedule: Optional[ScheduleScope] = ScheduleScope()
     container: Optional[ContainerScope] = ContainerScope()
+    sidecar: Optional[SidecarScope] = SidecarScope()
 
 
 class QueryEndpointResponse(FlexibleModel):
@@ -61,7 +62,7 @@ class QueryEndpointResponse(FlexibleModel):
 
 class ListEndpointsResponse(FlexibleModel):
     endpoints: list[QueryEndpointResponse]
-    cursor: str
+    cursor: Optional[str] = None
     limit: int
     total: int
 
@@ -72,9 +73,13 @@ class UpdateEndpointParams(FlexibleModel):
 
     queue_capacity: Optional[int] = None
     replicas: Optional[int] = None
-    resource: Optional[ResourceScope] = ResourceScope()
-    schedule: Optional[ScheduleScope] = ScheduleScope()
-    container: Optional[ContainerScope] = ContainerScope()
+
+    resource: Optional[ResourceScope] = None
+    schedule: Optional[ScheduleScope] = None
+    container: Optional[ContainerScope] = None
+    sidecar: Optional[SidecarScope] = None
+
+    need_restart: bool = True
 
 
 class QueryEndpointAutoscaleResponse(FlexibleModel):

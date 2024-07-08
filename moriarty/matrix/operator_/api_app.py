@@ -57,8 +57,8 @@ async def list_endpoints(
     limit: int = Query(100, ge=1, le=1000),
     cursor: str | None = None,
     keyword: str | None = None,
-    orderBy: str = Query("created_at", regex="^(name|created_at|updated_at)$"),
-    order: str = Query("desc", regex="^(asc|desc)$"),
+    orderBy: str = Query("created_at", pattern="^(created_at|updated_at|endpoint_name)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     operator: Operator = Depends(get_operaotr),
 ) -> ListEndpointsResponse:
     return await operator.list_endpoints(
@@ -81,51 +81,51 @@ async def create_endpoint(
 
 @app.get("/endpoint/{endpoint_name}/info")
 async def get_endpoint_info(
-    endpointd_name: str,
+    endpoint_name: str,
     operator: Operator = Depends(get_operaotr),
 ) -> QueryEndpointResponse:
-    return await operator.get_endpoint_info(endpointd_name)
+    return await operator.get_endpoint_info(endpoint_name)
 
 
 @app.post("/endpoint/{endpoint_name}/update")
 async def update_endpoint(
-    endpointd_name: str,
+    endpoint_name: str,
     params: UpdateEndpointParams,
     operator: Operator = Depends(get_operaotr),
 ) -> QueryEndpointResponse:
-    return await operator.update_endpoint(endpointd_name, params)
+    return await operator.update_endpoint(endpoint_name, params)
 
 
-@app.post("/endpoint/{endpointd_name}/delete")
+@app.post("/endpoint/{endpoint_name}/delete")
 async def delete_endpoint(
-    endpointd_name: str,
+    endpoint_name: str,
     operator: Operator = Depends(get_operaotr),
 ):
-    await operator.delete_endpoint(endpointd_name)
+    await operator.delete_endpoint(endpoint_name)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get("/autoscale/{endpoint_name}/info")
 async def autoscale_endpoint_info(
-    endpointd_name: str,
+    endpoint_name: str,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> QueryEndpointAutoscaleResponse:
-    return await autoscaler.get_autoscale_info(endpointd_name)
+    return await autoscaler.get_autoscale_info(endpoint_name)
 
 
 @app.post("/autoscale/{endpoint_name}/update")
 async def autoscale_endpoint(
-    endpointd_name: str,
+    endpoint_name: str,
     params: SetAutoscaleParams,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> QueryEndpointAutoscaleResponse:
-    return await autoscaler.update(endpointd_name, params)
+    return await autoscaler.update(endpoint_name, params)
 
 
 @app.post("/autoscale/{endpoint_name}/delete")
 async def autoscale_endpoint(
-    endpointd_name: str,
+    endpoint_name: str,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> QueryEndpointAutoscaleResponse:
-    await autoscaler.delete(endpointd_name)
+    await autoscaler.delete(endpoint_name)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -79,7 +79,7 @@ class Spawner:
     async def create(self, endpoint_orm: EndpointORM) -> None:
         raise NotImplementedError
 
-    async def update(self, endpoint_orm: EndpointORM) -> None:
+    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = False) -> None:
         raise NotImplementedError
 
     async def delete(self, endpoint_name: str) -> None:

@@ -169,9 +169,10 @@ class Operator:
         else:
             endpoint_orm = endpoint
 
-        endpoint_name = endpoint_orm.endpoint_name
         if not endpoint_orm:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint not found")
+
+        endpoint_name = endpoint_orm.endpoint_name
         return QueryEndpointResponse(
             endpoint_name=endpoint_orm.endpoint_name,
             image=endpoint_orm.image,
@@ -187,7 +188,7 @@ class Operator:
             ),
             schedule=ScheduleScope(
                 node_labels=endpoint_orm.node_labels,
-                node_selector=endpoint_orm.node_selector,
+                node_affinity=endpoint_orm.node_affinity,
             ),
             container=ContainerScope(
                 environment_variables=endpoint_orm.environment_variables,
@@ -237,10 +238,17 @@ class Operator:
             ],
             cursor=next_cursor,
             limit=limit,
-            total=(await self.session.execute(select(func.count(EndpointORM.id)))).scalar_one(),
+            total=(
+                await self.session.execute(select(func.count(EndpointORM.endpoint_name)))
+            ).scalar_one(),
         )
 
     async def create_endpoint(self, params: CreateEndpointParams) -> None:
+        if await self.get_endpoint_orm(params.endpoint_name):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Endpoint already exists"
+            )
+
         endpoint_orm = EndpointORM(
             endpoint_name=params.endpoint_name,
             queue_capacity=params.queue_capacity,
@@ -255,7 +263,7 @@ class Operator:
                     memory_request=params.resource.memory_request,
                     memory_limit=params.resource.memory_limit,
                     gpu_nums=params.resource.gpu_nums,
-                )
+                ).items()
                 if v is not None
             },
             **{
@@ -268,7 +276,7 @@ class Operator:
                     invoke_port=params.container.invoke_port,
                     invoke_path=params.container.invoke_path,
                     health_check_path=params.container.health_check_path,
-                )
+                ).items()
                 if v is not None
             },
             **{
@@ -276,17 +284,17 @@ class Operator:
                 for k, v in dict(
                     node_labels=params.schedule.node_labels,
                     node_affinity=params.schedule.node_affinity,
-                )
+                ).items()
                 if v is not None
             },
             **{
                 k: v
                 for k, v in dict(
-                    concurrency=params.schedule.concurrency,
-                    processing_time=params.schedule.processing_time,
-                    healthy_check_timeout=params.schedule.healthy_check_timeout,
-                    healthy_check_interval=params.schedule.healthy_check_interval,
-                )
+                    concurrency=params.sidecar.concurrency,
+                    process_timeout=params.sidecar.process_timeout,
+                    healthy_check_timeout=params.sidecar.healthy_check_timeout,
+                    healthy_check_interval=params.sidecar.healthy_check_interval,
+                ).items()
                 if v is not None
             },
         )
@@ -314,53 +322,69 @@ class Operator:
                     ).items()
                     if v is not None
                 },
-                **{
-                    k: v
-                    for k, v in dict(
-                        cpu_request=params.resource.cpu_request,
-                        cpu_limit=params.resource.cpu_limit,
-                        memory_request=params.resource.memory_request,
-                        memory_limit=params.resource.memory_limit,
-                        gpu_nums=params.resource.gpu_nums,
-                    )
-                    if v is not None
-                },
-                **{
-                    k: v
-                    for k, v in dict(
-                        environment_variables=params.container.environment_variables,
-                        environment_variables_secret_refs=params.container.environment_variables_secret_refs,
-                        commands=params.container.commands,
-                        args=params.container.args,
-                        invoke_port=params.container.invoke_port,
-                        invoke_path=params.container.invoke_path,
-                        health_check_path=params.container.health_check_path,
-                    )
-                    if v is not None
-                },
-                **{
-                    k: v
-                    for k, v in dict(
-                        node_labels=params.schedule.node_labels,
-                        node_affinity=params.schedule.node_affinity,
-                    )
-                    if v is not None
-                },
-                **{
-                    k: v
-                    for k, v in dict(
-                        concurrency=params.schedule.concurrency,
-                        processing_time=params.schedule.processing_time,
-                        healthy_check_timeout=params.schedule.healthy_check_timeout,
-                        healthy_check_interval=params.schedule.healthy_check_interval,
-                    )
-                    if v is not None
-                },
+                **(
+                    {
+                        k: v
+                        for k, v in dict(
+                            cpu_request=params.resource.cpu_request,
+                            cpu_limit=params.resource.cpu_limit,
+                            memory_request=params.resource.memory_request,
+                            memory_limit=params.resource.memory_limit,
+                            gpu_nums=params.resource.gpu_nums,
+                        ).items()
+                        if v is not None
+                    }
+                    if params.resource is not None
+                    else {}
+                ),
+                **(
+                    {
+                        k: v
+                        for k, v in dict(
+                            environment_variables=params.container.environment_variables,
+                            environment_variables_secret_refs=params.container.environment_variables_secret_refs,
+                            commands=params.container.commands,
+                            args=params.container.args,
+                            invoke_port=params.container.invoke_port,
+                            invoke_path=params.container.invoke_path,
+                            health_check_path=params.container.health_check_path,
+                        ).items()
+                        if v is not None
+                    }
+                    if params.container is not None
+                    else {}
+                ),
+                **(
+                    {
+                        k: v
+                        for k, v in dict(
+                            node_labels=params.schedule.node_labels,
+                            node_affinity=params.schedule.node_affinity,
+                        ).items()
+                        if v is not None
+                    }
+                    if params.schedule is not None
+                    else {}
+                ),
+                **(
+                    {
+                        k: v
+                        for k, v in dict(
+                            concurrency=params.sidecar.concurrency,
+                            process_timeout=params.sidecar.process_timeout,
+                            healthy_check_timeout=params.sidecar.healthy_check_timeout,
+                            healthy_check_interval=params.sidecar.healthy_check_interval,
+                        ).items()
+                        if v is not None
+                    }
+                    if params.schedule is not None
+                    else {}
+                ),
             )
         )
         await self.session.commit()
         await self.session.refresh(endpoint_orm)
-        await self.spawner.update(endpoint_orm)
+        await self.spawner.update(endpoint_orm, need_restart=params.need_restart)
         return await self.get_endpoint_info(endpoint_orm)
 
     async def delete_endpoint(self, endpoint_name: str) -> None:
