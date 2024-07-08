@@ -124,15 +124,10 @@ class KubeAutoscalerDaemon(DaemonMixin):
         logger.info(f"Triggering autoscaler...")
         async with open_redis_client(self.config) as redis_client:
             async with open_db_session(self.config) as session:
-                await self._scan_and_scale(session, redis_client)
-
-    async def _scan_and_scale(
-        self, session: AsyncSession, redis_client: redis.Redis | redis.RedisCluster
-    ) -> None:
-        manager = AutoscalerManager(
-            redis_client=redis_client, session=session, spawner=self.spawner
-        )
-        await manager.scan_and_scale()
+                autoscaler = AutoscalerManager(
+                    redis_client=redis_client, session=session, spawner=self.spawner
+                )
+                await autoscaler.scan_and_scale()
 
 
 class BridgeDaemon(DaemonMixin):

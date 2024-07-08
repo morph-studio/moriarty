@@ -13,6 +13,7 @@ from moriarty.matrix.operator_.operator_ import Operator, get_operaotr
 from moriarty.matrix.operator_.params import (
     CreateEndpointParams,
     ListEndpointsResponse,
+    QueryEndpointAutoscaleLogResponse,
     QueryEndpointAutoscaleResponse,
     QueryEndpointResponse,
     SetAutoscaleParams,
@@ -129,3 +130,17 @@ async def delete_autoscale(
 ) -> QueryEndpointAutoscaleResponse:
     await autoscaler.delete(endpoint_name)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/autoscale/{endpoint_name}/log")
+async def get_autoscale_log(
+    endpoint_name: str,
+    limit: int = Query(100, ge=1, le=1000),
+    cursor: int | None = None,
+    orderBy: str = Query("created_at", pattern="^(created_at|updated_at|endpoint_name)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
+    autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
+) -> QueryEndpointAutoscaleLogResponse:
+    return await autoscaler.get_autoscale_logs(
+        endpoint_name, limit=limit, cursor=cursor, order_by=orderBy, order=order
+    )
