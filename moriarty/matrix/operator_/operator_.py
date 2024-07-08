@@ -220,11 +220,13 @@ class Operator:
         query = select(EndpointORM)
         if keyword:
             query = query.where(EndpointORM.endpoint_name.contains(keyword))
+
         if cursor:
-            query = query.where(EndpointORM.id < cursor.id)
+            query = query.where(EndpointORM.id_ < cursor.id_)
 
         if order == "desc":
             query = query.order_by(getattr(EndpointORM, order_by).desc())
+
         else:
             query = query.order_by(getattr(EndpointORM, order_by))
 
