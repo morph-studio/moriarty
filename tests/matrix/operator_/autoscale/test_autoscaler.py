@@ -3,7 +3,7 @@ import pytest
 from moriarty.matrix.operator_.autoscaler import AutoscalerManager
 
 
-@pytest.fixturea
+@pytest.fixture
 async def autoscaler(
     async_redis_client,
     async_session,

@@ -184,11 +184,9 @@ def bridge_wrapper(bridge_manager):
 
 @pytest.fixture
 async def spawner(spawner_manager):
-    return (
-        await get_spawner(
-            spawner_name="mock",
-            spawner_manager=spawner_manager,
-        ),
+    return await get_spawner(
+        spawner_name="mock",
+        spawner_manager=spawner_manager,
     )
 
 
