@@ -114,7 +114,7 @@ class AutoscalerORM(Base):
     scale_in_cooldown = Column(Integer, nullable=False, default=60)
     scale_out_cooldown = Column(Integer, nullable=False, default=60)
 
-    metrics = Column(String, nullable=False, default=EndpointMetrics.pendding_jobs_per_instance)
+    metrics = Column(String, nullable=False, default=EndpointMetrics.pending_jobs_per_instance)
     metrics_threshold = Column(Float, nullable=False, default=3)
 
     created_at = Column(DateTime, nullable=False, default=func.now())

@@ -32,6 +32,7 @@ def get_autoscaler_manager(
 
 class EndpointMetrics(BaseModel):
     endpoint_name: str
+    metrics: dict[EndpointMetrics, float] = dict()
 
 
 class MetricsMixin:
@@ -43,10 +44,30 @@ class MetricsMixin:
         return JobProducer(redis_client=self.redis_client)
 
     async def get_metrics(self, endpoint_name: str) -> EndpointMetrics:
-        # TODO: Imp this later
+        unprocessed_count = await self.job_producer.count_unprocessed_jobs(
+            endpoint_name=endpoint_name
+        )
+        replicas = await self.spawner.count_avaliable_instances(endpoint_name)
         return EndpointMetrics(
             endpoint_name=endpoint_name,
+            metrics={
+                EndpointMetrics.pending_jobs: unprocessed_count,
+                EndpointMetrics.pending_jobs_per_instance: unprocessed_count / replicas,
+            },
         )
+
+    def calculate_least_replicas(
+        self,
+        metric: EndpointMetrics,
+        current_metric_value: float,
+        metric_threshold: float,
+    ) -> int:
+        if metric == EndpointMetrics.pending_jobs:
+            return current_metric_value - metric_threshold
+        if metric == EndpointMetrics.pending_jobs_per_instance:
+            return int(current_metric_value / metric_threshold)
+
+        raise NotImplementedError
 
 
 class CooldownMixin(AutoscaleMixin):
@@ -86,6 +107,12 @@ class CooldownMixin(AutoscaleMixin):
         cooldown_key = self.get_cooldown_key(endpoint_name, endpoint_orm.replicas < target_replicas)
         return bool(await self.redis_client.get(cooldown_key))
 
+    async def clear_cooldown(self, endpoint_name: str) -> None:
+        scaleout_key = self.get_cooldown_key(endpoint_name, True)
+        scalein_key = self.get_cooldown_key(endpoint_name, False)
+
+        await self.redis_client.delete(scaleout_key, scalein_key)
+
 
 class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
     def __init__(
@@ -115,7 +142,7 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
 
         metrics = await self.get_metrics(endpoint_name)
         target_replicas = await self._calculate_target_replicas(endpoint_name, metrics)
-        if await self._is_cooldown(endpoint_name, target_replicas):
+        if target_replicas is None or await self._is_cooldown(endpoint_name, target_replicas):
             return
         try:
             await self.spawner.scale(endpoint_name, target_replicas)
@@ -165,8 +192,37 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
         endpoint_name: str,
         current_metrics: EndpointMetrics,
     ) -> int:
-        # TODO: Imp this
-        return 1
+        autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
+
+        if not autoscaler_orm:
+            logger.warning(f"Autoscaler not found: {endpoint_name}, may be deleted?")
+            return None
+
+        current_metric = current_metrics.metrics.get(autoscaler_orm.metrics)
+        if current_metric is None:
+            logger.info(
+                f"No metrics found for {autoscaler_orm.endpoint_name}.{autoscaler_orm.metrics}"
+            )
+            return None
+
+        least_replicas = self.calculate_least_replicas(
+            metric=autoscaler_orm.metrics,
+            current_metric_value=current_metric,
+            metric_threshold=autoscaler_orm.metrics_threshold,
+        )
+        if least_replicas < autoscaler_orm.min_replicas:
+            logger.info(
+                f"Scale endpoint `{endpoint_name}` to min replicas {autoscaler_orm.min_replicas} as the least replicas is {least_replicas}"
+            )
+            return autoscaler_orm.min_replicas
+        if least_replicas > autoscaler_orm.max_replicas:
+            logger.info(
+                f"Scale endpoint `{endpoint_name}` to max replicas {autoscaler_orm.max_replicas} as the least replicas is {least_replicas}"
+            )
+            return autoscaler_orm.max_replicas
+
+        logger.info(f"Scale endpoint `{endpoint_name}` to {least_replicas}")
+        return least_replicas
 
     async def get_scaleable_endpoints(self) -> list[str]:
         return (
@@ -230,6 +286,9 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
             )
 
         await self.session.commit()
+        await self.clear_cooldown(endpoint_name)
+
+        logger.info(f"Autoscaler {endpoint_name} updated")
         return await self.get_autoscale_info(endpoint_name)
 
     async def delete(self, endpoint_name: str) -> None:
