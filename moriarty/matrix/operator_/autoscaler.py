@@ -201,30 +201,36 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
             metrics_threshold=autoscaler_orm.metrics_threshold,
         )
 
-    async def update(
-        self, endpointd_name: str, params: SetAutoscaleParams
+    async def set_autoscale(
+        self, endpoint_name: str, params: SetAutoscaleParams
     ) -> QueryEndpointAutoscaleResponse:
-        if not await self.get_autoscaler_orm(endpointd_name):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Autoscaler not found")
-        await self.session.execute(
-            update(AutoscalerORM)
-            .where(AutoscalerORM.endpoint_name == endpointd_name)
-            .values(
-                {
-                    k: v
-                    for k, v in dict(
-                        min_replicas=params.min_replicas,
-                        max_replicas=params.max_replicas,
-                        scale_in_cooldown=params.scale_in_cooldown,
-                        scale_out_cooldown=params.scale_out_cooldown,
-                        metrics=params.metrics,
-                        metrics_threshold=params.metrics_threshold,
-                    ).items()
-                    if v is not None
-                }
+        params = {
+            k: v
+            for k, v in dict(
+                min_replicas=params.min_replicas,
+                max_replicas=params.max_replicas,
+                scale_in_cooldown=params.scale_in_cooldown,
+                scale_out_cooldown=params.scale_out_cooldown,
+                metrics=params.metrics,
+                metrics_threshold=params.metrics_threshold,
+            ).items()
+            if v is not None
+        }
+        if not await self.get_autoscaler_orm(endpoint_name):
+            autoscaler_orm = AutoscalerORM(
+                endpoint_name=endpoint_name,
+                **params,
             )
-        )
-        return await self.get_autoscale_info(params.endpoint_name)
+            self.session.add(autoscaler_orm)
+        else:
+            await self.session.execute(
+                update(AutoscalerORM)
+                .where(AutoscalerORM.endpoint_name == endpoint_name)
+                .values(params)
+            )
+
+        await self.session.commit()
+        return await self.get_autoscale_info(endpoint_name)
 
     async def delete(self, endpoint_name: str) -> None:
         await self.session.execute(

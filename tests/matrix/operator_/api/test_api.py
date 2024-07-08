@@ -1,4 +1,8 @@
-from moriarty.matrix.operator_.params import CreateEndpointParams, UpdateEndpointParams
+from moriarty.matrix.operator_.params import (
+    CreateEndpointParams,
+    SetAutoscaleParams,
+    UpdateEndpointParams,
+)
 
 
 def test_hello(client):
@@ -74,4 +78,26 @@ def test_manage_endpoints(client):
 
 
 def test_manage_autoscale(client):
-    pass
+    endpoint_name = "hello-scaleable"
+
+    response = client.post(
+        "/endpoint/create",
+        data=CreateEndpointParams(endpoint_name=endpoint_name, image="busybox").model_dump_json(),
+    )
+    assert response.status_code == 201
+
+    response = client.get(f"/autoscale/{endpoint_name}/info")
+    assert response.status_code == 404
+
+    response = client.post(
+        f"/autoscale/{endpoint_name}/set", data=SetAutoscaleParams().model_dump_json()
+    )
+    assert response.status_code == 200
+    response = client.get(f"/autoscale/{endpoint_name}/info")
+    assert response.status_code == 200
+
+    response = client.post(f"/autoscale/{endpoint_name}/delete")
+    assert response.status_code == 204
+
+    response = client.get(f"/autoscale/{endpoint_name}/info")
+    assert response.status_code == 404

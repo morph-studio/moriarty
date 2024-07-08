@@ -113,17 +113,17 @@ async def autoscale_endpoint_info(
     return await autoscaler.get_autoscale_info(endpoint_name)
 
 
-@app.post("/autoscale/{endpoint_name}/update")
-async def autoscale_endpoint(
+@app.post("/autoscale/{endpoint_name}/set")
+async def set_autoscale(
     endpoint_name: str,
     params: SetAutoscaleParams,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> QueryEndpointAutoscaleResponse:
-    return await autoscaler.update(endpoint_name, params)
+    return await autoscaler.set_autoscale(endpoint_name, params)
 
 
 @app.post("/autoscale/{endpoint_name}/delete")
-async def autoscale_endpoint(
+async def delete_autoscale(
     endpoint_name: str,
     autoscaler: AutoscalerManager = Depends(get_autoscaler_manager),
 ) -> QueryEndpointAutoscaleResponse:
