@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 
 import docker
 from moriarty import mock
+from moriarty.envs import get_bridge_name
 from moriarty.matrix.connector.app import app as APP
-from moriarty.matrix.envs import get_bridge_name
 from moriarty.matrix.job_manager.bridge.manager import BridgeManager
 from moriarty.matrix.job_manager.bridge_wrapper import get_bridge_manager
 

@@ -71,7 +71,7 @@ class EndpointORM(Base):
     invoke_port = Column(Integer, nullable=False, default=8080)
     invoke_path = Column(String(255), nullable=False, default="/invocations")
     health_check_path = Column(String(255), nullable=False, default="/ping")
-
+    allow_retry = Column(Boolean, nullable=False, default=False)
     # Schedule
     node_labels = Column(JSON, nullable=False, default={})
     node_affinity = Column(JSON, nullable=False, default={})
@@ -79,8 +79,8 @@ class EndpointORM(Base):
     # Config for sidecar
     concurrency = Column(Integer, nullable=False, default=1)
     process_timeout = Column(Integer, nullable=False, default=3600)
-    healthy_check_timeout = Column(Integer, nullable=False, default=1200)
-    healthy_check_interval = Column(Integer, nullable=False, default=5)
+    health_check_timeout = Column(Integer, nullable=False, default=1200)
+    health_check_interval = Column(Integer, nullable=False, default=5)
 
 
 class InferenceLogORM(Base):

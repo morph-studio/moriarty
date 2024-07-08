@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 
+from moriarty.envs import MORIARTY_MATRIX_TOKEN_ENV
 from moriarty.log import logger
-from moriarty.matrix.envs import MORIARTY_MATRIX_TOKEN_ENV
 from moriarty.matrix.operator_.autoscaler import (
     AutoscalerManager,
     get_autoscaler_manager,

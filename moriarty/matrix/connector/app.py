@@ -3,10 +3,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
+from moriarty.envs import MORIARTY_MATRIX_TOKEN_ENV
 from moriarty.log import logger
 from moriarty.matrix.connector.invoker import Invoker, get_invoker
 from moriarty.matrix.connector.params import InvokeParams, InvokeResponse
-from moriarty.matrix.envs import MORIARTY_MATRIX_TOKEN_ENV
 
 TOKEN = os.getenv(MORIARTY_MATRIX_TOKEN_ENV)
 

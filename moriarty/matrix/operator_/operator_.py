@@ -8,9 +8,9 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from moriarty.envs import get_bridge_result_queue_url
 from moriarty.log import logger
 from moriarty.matrix.connector.invoker import get_bridge_name
-from moriarty.matrix.envs import get_bridge_result_queue_url
 from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper, get_bridge_wrapper
 from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
 from moriarty.matrix.operator_.autoscaler import (
@@ -294,8 +294,8 @@ class Operator:
                 for k, v in dict(
                     concurrency=params.sidecar.concurrency,
                     process_timeout=params.sidecar.process_timeout,
-                    healthy_check_timeout=params.sidecar.healthy_check_timeout,
-                    healthy_check_interval=params.sidecar.healthy_check_interval,
+                    health_check_timeout=params.sidecar.health_check_timeout,
+                    health_check_interval=params.sidecar.health_check_interval,
                 ).items()
                 if v is not None
             },
@@ -374,8 +374,8 @@ class Operator:
                         for k, v in dict(
                             concurrency=params.sidecar.concurrency,
                             process_timeout=params.sidecar.process_timeout,
-                            healthy_check_timeout=params.sidecar.healthy_check_timeout,
-                            healthy_check_interval=params.sidecar.healthy_check_interval,
+                            health_check_timeout=params.sidecar.health_check_timeout,
+                            health_check_interval=params.sidecar.health_check_interval,
                         ).items()
                         if v is not None
                     }

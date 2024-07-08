@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pluggy
 
+from moriarty.envs import *
 from moriarty.matrix.operator_.orm import EndpointORM
 from moriarty.tools import FlexibleModel
 
@@ -67,7 +68,40 @@ class EndpointRuntimeInfo(FlexibleModel):
     error_node_nums: int
 
 
-class Spawner:
+class EnvironmentBuilder:
+    def build_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
+        return {
+            **{str(k): str(v) for k, v in endpoint_orm.environment_variables.items()},
+            **{
+                k: v
+                for k, v in {
+                    # For brq
+                    REDIS_URL_ENV: os.getenv(REDIS_URL_ENV),
+                    REDIS_HOST_ENV: os.getenv(REDIS_HOST_ENV),
+                    REDIS_PORT_ENV: os.getenv(REDIS_PORT_ENV),
+                    REDIS_DB_ENV: os.getenv(REDIS_DB_ENV),
+                    REDIS_CLUSTER_ENV: os.getenv(REDIS_CLUSTER_ENV),
+                    REDIS_TLS_ENV: os.getenv(REDIS_TLS_ENV),
+                    REDIS_USERNAME_ENV: os.getenv(REDIS_USERNAME_ENV),
+                    REDIS_PASSWORD_ENV: os.getenv(REDIS_PASSWORD_ENV),
+                    # For sidecar
+                    ENDPOINT_NAME_ENV: endpoint_orm.endpoint_name,
+                    INVOKE_HOST_ENV: "localhost",
+                    INVOKE_PORT_ENV: endpoint_orm.invoke_port,
+                    INVOKE_PATH_ENV: endpoint_orm.invoke_path,
+                    HEALTH_CHECK_PATH_ENV: endpoint_orm.health_check_path,
+                    ENABLE_RETRY_ENV: endpoint_orm.allow_retry,
+                    CONCURRENCY_ENV: endpoint_orm.concurrency,
+                    PROCESS_TIMEOUT_ENV: endpoint_orm.process_timeout,
+                    HEALTH_CHECK_TIMEOUT_ENV: endpoint_orm.health_check_timeout,
+                    HEALTH_CHECK_INTERVAL_ENV: endpoint_orm.health_check_interval,
+                }.items()
+                if v is not None
+            },
+        }
+
+
+class Spawner(EnvironmentBuilder):
     register_name: str
 
     async def prepare(self) -> None:

@@ -57,7 +57,6 @@ email = "jizhongsheng957@gmail.com"
 
 [project.scripts]
 
-moriarty-init = "moriarty.init.cli:cli"
 moriarty-matrix = "moriarty.matrix.cli:cli"
 moriarty-operator = "moriarty.matrix.operator_.cli:cli"
 moriarty-connector = "moriarty.matrix.connector.cli:cli"

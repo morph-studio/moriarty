@@ -10,18 +10,20 @@ try:
 except ImportError:
     from functools import lru_cache as cache
 
+from moriarty.envs import *
+
 
 def get_config() -> Config:
     default = {
-        "DB_HOST": "localhost",
-        "DB_PORT": 5432,
-        "DB_USER": "postgres",
-        "DB_PASSWORD": "Th3PAssW0rd!1.",
-        "DB_DATABASE": "moriarty-matrix",
-        "REDIS_HOST": "localhost",
-        "REDIS_PORT": 6379,
-        "REDIS_DB": 6,
-        "REDIS_TLS": False,
+        DB_HOST_ENV: "localhost",
+        DB_PORT_ENV: 5432,
+        DB_USER_ENV: "postgres",
+        DB_PASSWORD_ENV: "Th3PAssW0rd!1.",
+        DB_DATABASE_ENV: "moriarty-matrix",
+        REDIS_HOST_ENV: "localhost",
+        REDIS_PORT_ENV: 6379,
+        REDIS_DB_ENV: 6,
+        REDIS_TLS_ENV: False,
     }
 
     return Config.from_env(default)
@@ -36,11 +38,11 @@ class DBConfig(BaseModel):
 
     @classmethod
     def from_env(cls, default: dict[str, str]) -> "DBConfig":
-        host = os.getenv("DB_HOST", default.get("DB_HOST", "localhost"))
-        port = int(os.getenv("DB_PORT", default.get("DB_PORT", 5432)))
-        user = os.getenv("DB_USER", default.get("DB_USER", "postgres"))
-        password = os.getenv("DB_PASSWORD", default.get("DB_PASSWORD", "postgres"))
-        database = os.getenv("DB_DATABASE", default.get("DB_DATABASE", "postgres"))
+        host = os.getenv(DB_HOST_ENV, default.get(DB_HOST_ENV, "localhost"))
+        port = int(os.getenv(DB_PORT_ENV, default.get(DB_PORT_ENV, 5432)))
+        user = os.getenv(DB_USER_ENV, default.get(DB_USER_ENV, "postgres"))
+        password = os.getenv(DB_PASSWORD_ENV, default.get(DB_PASSWORD_ENV, "postgres"))
+        database = os.getenv(DB_DATABASE_ENV, default.get(DB_DATABASE_ENV, "postgres"))
         return cls(
             host=host,
             port=port,
@@ -66,19 +68,19 @@ class RedisConfig(BaseModel):
 
     @classmethod
     def from_env(cls, default: dict[str, str]) -> "RedisConfig":
-        host = os.getenv("REDIS_HOST", default.get("REDIS_HOST", "localhost"))
-        port = int(os.getenv("REDIS_PORT", default.get("REDIS_PORT", 6379)))
-        password = os.getenv("REDIS_PASSWORD", default.get("REDIS_PASSWORD", ""))
-        db = int(os.getenv("REDIS_DB", default.get("REDIS_DB", 6)))
+        host = os.getenv(REDIS_HOST_ENV, default.get(REDIS_HOST_ENV, "localhost"))
+        port = int(os.getenv(REDIS_PORT_ENV, default.get(REDIS_PORT_ENV, 6379)))
+        password = os.getenv(REDIS_PASSWORD_ENV, default.get(REDIS_PASSWORD_ENV, ""))
+        db = int(os.getenv(REDIS_DB_ENV, default.get(REDIS_DB_ENV, 6)))
         tls = (
-            os.getenv("REDIS_TLS") in ["True", "true"]
-            if os.getenv("REDIS_TLS")
-            else default.get("REDIS_TLS", False)
+            os.getenv(REDIS_TLS_ENV) in ["True", "true"]
+            if os.getenv(REDIS_TLS_ENV)
+            else default.get(REDIS_TLS_ENV, False)
         )
         cluster = (
-            os.getenv("REDIS_CLUSTER") in ["True", "true"]
-            if os.getenv("REDIS_CLUSTER")
-            else default.get("REDIS_CLUSTER", False)
+            os.getenv(REDIS_CLUSTER_ENV) in ["True", "true"]
+            if os.getenv(REDIS_CLUSTER_ENV)
+            else default.get(REDIS_CLUSTER_ENV, False)
         )
         return cls(
             host=host,

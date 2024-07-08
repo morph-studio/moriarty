@@ -32,8 +32,8 @@ class ContainerScope(FlexibleModel):
 class SidecarScope(FlexibleModel):
     concurrency: Optional[int] = 1
     process_timeout: Optional[int] = 3600
-    healthy_check_timeout: Optional[int] = 1200
-    healthy_check_interval: Optional[int] = 5
+    health_check_timeout: Optional[int] = 1200
+    health_check_interval: Optional[int] = 5
 
 
 class CreateEndpointParams(FlexibleModel):

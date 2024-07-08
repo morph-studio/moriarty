@@ -36,14 +36,14 @@ class InferencerConsumer:
         enable_ssl: bool = False,
         concurrency: int = 1,
         process_timeout: int = 3600,
-        healthy_check_timeout: int = 1200,
-        healthy_check_interval: int = 5,
+        health_check_timeout: int = 1200,
+        health_check_interval: int = 5,
         **kwargs,
     ):
         self.redis_client = redis_client
         self.process_timeout = process_timeout
-        self.healthy_check_timeout = healthy_check_timeout
-        self.healthy_check_interval = healthy_check_interval
+        self.health_check_timeout = health_check_timeout
+        self.health_check_interval = health_check_interval
 
         scheme = "https" if enable_ssl else "http"
         proxy_url = f"{scheme}://{invoke_host}:{invoke_port}"
@@ -110,13 +110,13 @@ class InferencerConsumer:
 
     async def run_forever(self) -> None:
         try:
-            async with async_timeout.timeout(self.healthy_check_timeout):
+            async with async_timeout.timeout(self.health_check_timeout):
                 logger.info(
-                    f"Wait for invoke endpoint online...timeout: {self.healthy_check_timeout}s"
+                    f"Wait for invoke endpoint online...timeout: {self.health_check_timeout}s"
                 )
                 await self.wait_for_health_check()
         except TimeoutError:
-            logger.error(f"Invoke endpoint not online in {self.healthy_check_timeout}s. Exit...")
+            logger.error(f"Invoke endpoint not online in {self.health_check_timeout}s. Exit...")
             raise
 
         logger.info(f"Healthy check passed. Start consumer...")
@@ -131,4 +131,4 @@ class InferencerConsumer:
                     break
                 except httpx.ConnectError as e:
                     logger.debug(f"Ping {self.health_check_path} failed: {e}")
-                    await asyncio.sleep(self.healthy_check_interval)
+                    await asyncio.sleep(self.health_check_interval)
