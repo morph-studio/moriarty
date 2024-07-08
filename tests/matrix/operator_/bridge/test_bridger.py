@@ -1,13 +1,20 @@
 import pytest
+from click.testing import CliRunner
 
 from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper
 from moriarty.matrix.job_manager.params import InferenceJob
+from moriarty.matrix.operator_.cli import drop
 from moriarty.matrix.operator_.operator_ import Bridger
 from moriarty.matrix.operator_.orm import EndpointORM
 
 
 @pytest.fixture
 async def mock_endpoint(async_session):
+    runner = CliRunner()
+    # Drop all before testing
+    result = runner.invoke(drop, ["--yes"])
+    assert result.exit_code == 0
+
     name = "mock"
 
     async_session.add(
