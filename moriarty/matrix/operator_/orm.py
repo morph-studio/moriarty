@@ -136,7 +136,7 @@ class AutoscaleLogORM(Base):
     new_replicas = Column(Integer, nullable=False)
     metrics = Column(String, nullable=False)
     metrics_threshold = Column(Float, nullable=False)
-    metrics_value = Column(Float, nullable=False)
+    metrics_log = Column(JSON, nullable=False)
     details = Column(String, nullable=False)
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(

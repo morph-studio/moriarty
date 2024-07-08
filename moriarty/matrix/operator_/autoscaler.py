@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from moriarty.log import logger
 from moriarty.matrix.operator_.dbutils import get_db_session
+from moriarty.matrix.operator_.mixin import AutoscaleMixin, EndpointMixin
 from moriarty.matrix.operator_.orm import AutoscaleLogORM, AutoscalerORM, EndpointORM
 from moriarty.matrix.operator_.params import (
     QueryEndpointAutoscaleResponse,
@@ -42,12 +43,51 @@ class MetricsMixin:
         return JobProducer(redis_client=self.redis_client)
 
     async def get_metrics(self, endpoint_name: str) -> EndpointMetrics:
+        # TODO: Imp this later
         return EndpointMetrics(
             endpoint_name=endpoint_name,
         )
 
 
-class AutoscalerManager(MetricsMixin):
+class CooldownMixin(AutoscaleMixin):
+    prefix = "moriarty:autoscaler:cooldown"
+    separator = ":"
+    redis_client: redis.Redis | redis.RedisCluster
+
+    def get_cooldown_key(self, endpoint_name: str, is_scale_out: bool) -> str:
+        return self.separator.join(
+            [
+                self.prefix,
+                "{%s}" % endpoint_name,
+                "scaleup" if is_scale_out else "scaledown",
+            ]
+        )
+
+    async def set_cooldown(self, endpoint_name: str, is_scale_out: bool) -> None:
+        autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
+
+        if not autoscaler_orm:
+            logger.warning(f"Autoscaler not found: {endpoint_name}, may be deleted?")
+            return
+
+        cooldown_key = self.get_cooldown_key(endpoint_name, is_scale_out)
+        cooldown_ttl = (
+            autoscaler_orm.scale_out_cooldown if is_scale_out else autoscaler_orm.scale_in_cooldown
+        )
+        await self.redis_client.set(cooldown_key, 1, ex=cooldown_ttl)
+
+    async def _is_cooldown(self, endpoint_name: str, target_replicas: int) -> bool:
+        endpoint_orm = await self.get_endpoint_orm(endpoint_name)
+
+        if not endpoint_orm or endpoint_orm.replicas == target_replicas:
+            # Not exist or already scaled, treat as cooldown to skip
+            return True
+
+        cooldown_key = self.get_cooldown_key(endpoint_name, endpoint_orm.replicas < target_replicas)
+        return bool(await self.redis_client.get(cooldown_key))
+
+
+class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
     def __init__(
         self,
         redis_client: redis.Redis | redis.RedisCluster,
@@ -74,23 +114,59 @@ class AutoscalerManager(MetricsMixin):
             return
 
         metrics = await self.get_metrics(endpoint_name)
-        target_replicas = await self._calculate_target_replicas(metrics, endpoint_name)
+        target_replicas = await self._calculate_target_replicas(endpoint_name, metrics)
         if await self._is_cooldown(endpoint_name, target_replicas):
             return
+        try:
+            await self.spawner.scale(endpoint_name, target_replicas)
+        except Exception as e:
+            logger.exception(e)
+            await self._revoke_scale(endpoint_name, metrics, target_replicas)
+        else:
+            await self._commit_scale(self, endpoint_name, metrics, target_replicas)
 
-        await self.spawner.scale(endpoint_name, target_replicas)
-        await self._log_scale(self, endpoint_name, metrics, target_replicas)
+    async def _revoke_scale(self, endpoint_name: str) -> None:
+        endpoint_orm = await self.get_endpoint_orm(endpoint_name)
+        if endpoint_orm is None:
+            logger.warning(f"Endpoint not found: {endpoint_name}, may be deleted?")
+            return
+        await self.spawner.scale(endpoint_name, endpoint_orm.replicas)
 
-    async def _log_scale(
+    async def _commit_scale(
         self, endpoint_name: str, metrics: EndpointMetrics, target_replicas: int
     ) -> None:
-        pass
+        endpoint_orm = await self.get_endpoint_orm(endpoint_name)
+        autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
 
-    async def _is_cooldown(self, endpoint_name: str, target_replicas: int) -> bool:
-        pass
+        is_scale_out = endpoint_orm.replicas < target_replicas
 
-    async def _calculate_target_replicas(self, current_metrics, endpoint_name) -> int:
-        pass
+        logger.info(
+            f"Commit scale endpoint `{endpoint_name}` {endpoint_orm.replicas} -> {target_replicas}"
+        )
+        log_orm = AutoscaleLogORM(
+            endpoint_name=endpoint_name,
+            old_replicas=endpoint_orm.replicas,
+            new_replicas=target_replicas,
+            metrics=autoscaler_orm.metrics,
+            metrics_threshold=autoscaler_orm.metrics_threshold,
+            metrics_value=metrics.model_dump(),
+        )
+        self.session.add(log_orm)
+        await self.session.execute(
+            update(EndpointORM)
+            .where(EndpointORM.endpoint_name == endpoint_name)
+            .values(replicas=target_replicas)
+        )
+        await self.session.commit()
+        await self.set_cooldown(endpoint_name, is_scale_out)
+
+    async def _calculate_target_replicas(
+        self,
+        endpoint_name: str,
+        current_metrics: EndpointMetrics,
+    ) -> int:
+        # TODO: Imp this
+        return 1
 
     async def get_scaleable_endpoints(self) -> list[str]:
         return (
@@ -109,13 +185,6 @@ class AutoscalerManager(MetricsMixin):
         await self._clean_not_exist_endpoint()
         for endpoint in await self.get_scaleable_endpoints():
             await self._scale(endpoint)
-
-    async def get_autoscaler_orm(self, endpoint_name: str) -> AutoscalerORM | None:
-        return (
-            await self.session.execute(
-                select(AutoscalerORM).where(AutoscalerORM.endpoint_name == endpoint_name)
-            )
-        ).scalar_one_or_none()
 
     async def get_autoscale_info(self, endpoint_name: str) -> QueryEndpointAutoscaleResponse:
         autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
