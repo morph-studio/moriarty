@@ -113,11 +113,17 @@ class EnvironmentBuilder:
 
     def build_init_environment(self) -> dict[str, str]:
         return {
-            "AWS_ACCESS_KEY_ID": self.model_s3_access_key_id,
-            "AWS_SECRET_ACCESS_KEY": self.model_s3_secret_access_key,
-            "AWS_S3_ENDPOINT_URL": self.model_s3_endpoint_url,
-            "AWS_REGION_NAME": self.model_aws_region_name,
-            "S3_ENDPOINT_URL": self.model_s3_endpoint_url,
+            **{
+                k: str(v)
+                for k, v in {
+                    "AWS_ACCESS_KEY_ID": self.model_s3_access_key_id,
+                    "AWS_SECRET_ACCESS_KEY": self.model_s3_secret_access_key,
+                    "AWS_S3_ENDPOINT_URL": self.model_s3_endpoint_url,
+                    "AWS_REGION_NAME": self.model_aws_region_name,
+                    "S3_ENDPOINT_URL": self.model_s3_endpoint_url,
+                }.items()
+                if v is not None
+            },
         }
 
 
