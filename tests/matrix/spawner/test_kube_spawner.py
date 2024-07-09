@@ -16,7 +16,7 @@ async def kube_spawner():
     try:
         return await get_spawner("kube", get_spawner_manager())
     except kubernetes.config.config_exception.ConfigException:
-        pytest.skip("Kubernetes is not available")
+        pytest.skip("Kubernetes is not available, use minikube or kind for tests")
 
 
 async def test_kube_spawner(kube_spawner: KubeSpawner):

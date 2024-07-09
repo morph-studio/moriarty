@@ -58,10 +58,13 @@ class MetricsManager:
         raise NotImplementedError
 
     def calculate_queue_capacity(self, autoscaler: AutoscalerORM) -> int:
-        if autoscaler.metric == MetricType.pending_jobs:
+        metric: MetricType = autoscaler.metric
+        if metric == MetricType.pending_jobs:
             return autoscaler.metrics_threshold + autoscaler.max_replicas + 1
-        if autoscaler.metric == MetricType.pending_jobs_per_instance:
+        if metric == MetricType.pending_jobs_per_instance:
             return math.ceil(autoscaler.metrics_threshold) * autoscaler.max_replicas + 1
+
+        raise NotImplementedError
 
 
 class EndpointMixin:
