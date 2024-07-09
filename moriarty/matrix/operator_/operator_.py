@@ -200,10 +200,12 @@ class Operator:
                 memory_request=endpoint_orm.memory_request,
                 memory_limit=endpoint_orm.memory_limit,
                 gpu_nums=endpoint_orm.gpu_nums,
+                gpu_type=endpoint_orm.gpu_type,
             ),
             schedule=ScheduleScope(
                 node_labels=endpoint_orm.node_labels,
                 node_affinity=endpoint_orm.node_affinity,
+                pod_labels=endpoint_orm.pod_labels,
             ),
             container=ContainerScope(
                 environment_variables=endpoint_orm.environment_variables,
@@ -280,6 +282,7 @@ class Operator:
                     memory_request=params.resource.memory_request,
                     memory_limit=params.resource.memory_limit,
                     gpu_nums=params.resource.gpu_nums,
+                    gpu_type=params.resource.gpu_type,
                 ).items()
                 if v is not None
             },
@@ -301,6 +304,7 @@ class Operator:
                 for k, v in dict(
                     node_labels=params.schedule.node_labels,
                     node_affinity=params.schedule.node_affinity,
+                    pod_labels=params.schedule.pod_labels,
                 ).items()
                 if v is not None
             },
@@ -325,6 +329,16 @@ class Operator:
         if not endpoint_orm:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint not found")
 
+        if (
+            params.replicas
+            and endpoint_orm.replicas != params.replicas
+            and await self.autoscaler_manager.get_autoscaler_orm(endpoint_name)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Replicas cannot be updated as autoscaler is enabled. Try set autoscaler.",
+            )
+
         await self.session.execute(
             update(EndpointORM)
             .where(EndpointORM.endpoint_name == endpoint_name)
@@ -348,6 +362,7 @@ class Operator:
                             memory_request=params.resource.memory_request,
                             memory_limit=params.resource.memory_limit,
                             gpu_nums=params.resource.gpu_nums,
+                            gpu_type=params.resource.gpu_type,
                         ).items()
                         if v is not None
                     }
@@ -377,6 +392,7 @@ class Operator:
                         for k, v in dict(
                             node_labels=params.schedule.node_labels,
                             node_affinity=params.schedule.node_affinity,
+                            pod_labels=params.schedule.pod_labels,
                         ).items()
                         if v is not None
                     }

@@ -1,3 +1,4 @@
+import datetime
 import os
 import string
 from typing import Optional
@@ -5,12 +6,13 @@ from typing import Optional
 import escapism
 from kubernetes_asyncio import client
 from kubernetes_asyncio.client.api_client import ApiClient
-from kubernetes_asyncio.client.models import V1DeploymentStatus
 
+from moriarty.__init__ import __version__
 from moriarty.log import logger
 from moriarty.matrix.operator_.orm import EndpointORM
 from moriarty.matrix.operator_.spawner.plugin import (
     EndpointRuntimeInfo,
+    EnvironmentBuilder,
     Spawner,
     hookimpl,
 )
@@ -23,8 +25,11 @@ def get_current_namespace() -> str | None:
     return open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
 
 
-class DeploymentMixin:
+class DeploymentMixin(EnvironmentBuilder):
     namespace: str
+    init_image = os.getenv("INIT_IMAGE", "peakcom/s5cmd")
+    sidecar_image = os.getenv("SIDECAR_IMAGE", "wh1isper/moriarty-sidecar")
+    image_pull_secrets = os.getenv("IMAGE_PULL_SECRETS")
 
     def _escape_string(self, s: str) -> str:
         safe_chars = set(string.ascii_lowercase + string.digits)
@@ -34,7 +39,9 @@ class DeploymentMixin:
         # Escape the endpoint name
         return self._escape_string(f"moriarty-{endpoint_name}")
 
-    async def inspect_deployment_status(self, endpoint_name: str) -> V1DeploymentStatus | None:
+    async def inspect_deployment_status(
+        self, endpoint_name: str
+    ) -> client.V1DeploymentStatus | None:
         deployment_name = self.get_deployment_name(endpoint_name)
 
         async with ApiClient() as api:
@@ -50,6 +57,265 @@ class DeploymentMixin:
                 raise
 
             return deployment.status
+
+    async def make_and_apply_deployment(self, endpoint_orm: EndpointORM) -> None:
+        deployment = self._make_deployment(endpoint_orm)
+        await self._apply_deployment(deployment)
+
+    async def delete_deployment(self, endpoint_name: str) -> None:
+        deployment_name = self.get_deployment_name(endpoint_name)
+        async with ApiClient() as api:
+            v1 = client.AppsV1Api(api)
+            await v1.delete_namespaced_deployment(name=deployment_name, namespace=self.namespace)
+
+    async def restart_deployment(self, endpoint_name: str) -> None:
+        now = datetime.datetime.now()
+        now = str(now.isoformat("T") + "Z")
+        body = {
+            "spec": {
+                "template": {
+                    "metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": now}}
+                }
+            }
+        }
+        deployment = self.get_deployment_name(endpoint_name)
+        namespace = self.namespace
+
+        async with ApiClient() as api:
+            v1_apps = client.AppsV1Api(api)
+            v1_apps.patch_namespaced_deployment(deployment, namespace, body, pretty="true")
+
+    async def scale_deployment(self, endpoint_name: str, target_replicas: int) -> None:
+        deployment = self.get_deployment_name(endpoint_name)
+        namespace = self.namespace
+        async with ApiClient() as api:
+            v1 = client.AppsV1Api(api)
+            await v1.patch_namespaced_deployment_scale(
+                name=deployment,
+                namespace=namespace,
+                body={"spec": {"replicas": target_replicas}},
+            )
+
+    async def _apply_deployment(self, deployment: client.V1Deployment) -> None:
+        async with ApiClient() as api:
+            v1 = client.AppsV1Api(api)
+            await v1.create_namespaced_deployment(namespace=self.namespace, body=deployment)
+
+    def _make_deployment(
+        self,
+        endpoint_orm: EndpointORM,
+    ) -> client.V1Deployment:
+        deployment_name = self.get_deployment_name(endpoint_orm.endpoint_name)
+
+        deployment = client.V1Deployment()
+
+        deployment.api_version = "apps/v1"
+        deployment.kind = "Deployment"
+
+        deployment.metadata = client.V1ObjectMeta()
+        deployment.metadata.name = deployment_name
+        deployment.metadata.namespace = self.namespace
+        deployment.metadata.labels = {
+            "moriarty/version": __version__,
+            "moriarty/kubespawner/version": __version__,
+            "moriarty/kubespawner/gpu-nums": str(endpoint_orm.gpu_nums or 0),
+            "moriarty/kubespawner/gpu-type": str(endpoint_orm.gpu_type or ""),
+        }
+
+        deployment.spec = client.V1DeploymentSpec()
+        deployment.spec.replicas = endpoint_orm.replicas
+        deployment.spec.selector = client.V1LabelSelector()
+        deployment.spec.selector.match_labels = {
+            str(k): str(v) for k, v in endpoint_orm.node_labels.items()
+        }
+        deployment.spec.template = client.V1PodTemplateSpec()
+        deployment.spec.template.metadata = client.V1ObjectMeta()
+        deployment.spec.template.metadata.labels = {
+            str(k): str(v) for k, v in endpoint_orm.pod_labels.items()
+        }
+
+        deployment.spec.template.spec = client.V1PodSpec()
+        deployment.spec.template.spec.restart_policy = "Always"
+        deployment.spec.template.spec.affinity = client.V1Affinity(
+            node_affinity=client.V1NodeAffinity(
+                required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
+                    node_selector_terms=[
+                        client.V1NodeSelectorTerm(
+                            match_expressions=[
+                                {
+                                    "key": k,
+                                    "operator": "In",
+                                    "values": v,
+                                }
+                                for k, v in endpoint_orm.node_affinity.items()
+                            ]
+                        )
+                    ]
+                )
+            )
+        )
+
+        deployment.spec.template.spec.init_containers = [self._make_init_container(endpoint_orm)]
+        deployment.spec.template.spec.containers = [
+            self._make_sidecar_container(endpoint_orm),
+            self._make_compute_contaienr(endpoint_orm),
+        ]
+        deployment.spec.template.spec.volumes = [
+            client.V1Volume(
+                name="modeldir",
+                empty_dir=client.V1EmptyDirVolumeSource(),
+            ),
+        ]
+
+        if self.image_pull_secrets:
+            deployment.spec.template.spec.image_pull_secrets = [
+                client.V1LocalObjectReference(
+                    name=self.image_pull_secrets,
+                )
+            ]
+
+        return deployment
+
+    def _make_init_container(
+        self,
+        endpoint_orm: EndpointORM,
+    ) -> client.V1Container:
+        # Use init container to /opt/ml/model
+        command = [
+            "mkdir",
+            "-p",
+            "/opt/ml/model",
+        ]
+
+        if endpoint_orm.model_dir:
+            if endpoint_orm.model_dir.endswith("/"):
+                command.extend(
+                    [
+                        "&&",
+                        "s5cmd",
+                        "cp",
+                        f"{endpoint_orm.model_dir}/*",
+                        "/opt/ml/model/",
+                    ]
+                )
+            else:
+                command.extend(
+                    [
+                        "&&",
+                        "s5cmd",
+                        "cp",
+                        endpoint_orm.model_dir,
+                        "/opt/ml/model/",
+                    ]
+                )
+
+        # Make sure the model dir is read-only
+        command.extend(
+            [
+                "&&",
+                "chmod",
+                "-R",
+                "444",
+                "/opt/ml/model",
+            ]
+        )
+
+        return client.V1Container(
+            name="init",
+            image=self.init_image,
+            command=command,
+            volume_mounts=[
+                client.V1VolumeMount(
+                    name="modeldir",
+                    mount_path="/opt/ml/model",
+                ),
+            ],
+            env=[
+                client.V1EnvVar(name=k, value=v) for k, v in self.build_init_environment().items()
+            ],
+        )
+
+    def _make_sidecar_container(
+        self,
+        endpoint_orm: EndpointORM,
+    ) -> client.V1Container:
+        return client.V1Container(
+            name="sidecar",
+            image=self.sidecar_image,
+            resources=client.V1ResourceRequirements(
+                requests={
+                    "cpu": "100m",
+                    "memory": "256Mi",
+                },
+                limits={
+                    "cpu": "100m",
+                    "memory": "256Mi",
+                },
+            ),
+            env=[
+                client.V1EnvVar(name=k, value=v)
+                for k, v in self.build_sidecar_environment(endpoint_orm).items()
+            ],
+        )
+
+    def _make_compute_contaienr(
+        self,
+        endpoint_orm: EndpointORM,
+    ) -> client.V1Container:
+        gpu_limit = {}
+        if endpoint_orm.gpu_nums:
+            gpu_limit = {
+                endpoint_orm.gpu_type: endpoint_orm.gpu_nums,
+            }
+
+        return client.V1Container(
+            name="compute",
+            image=self.compute_image,
+            command=endpoint_orm.commands,
+            args=endpoint_orm.args,
+            resources=client.V1ResourceRequirements(
+                requests={
+                    "cpu": f"{endpoint_orm.cpu_request}",
+                    "memory": f"{endpoint_orm.memory_request}Mi",
+                },
+                limits={
+                    "cpu": f"{endpoint_orm.cpu_limit}",
+                    "memory": f"{endpoint_orm.memory_limit}Mi",
+                    **gpu_limit,
+                },
+            ),
+            env=[
+                client.V1EnvVar(name=k, value=v)
+                for k, v in self.build_compute_environment(endpoint_orm).items()
+            ],
+            env_from=[
+                client.V1EnvFromSource(secret_ref=client.V1SecretEnvSource(name=secret_ref))
+                for secret_ref in endpoint_orm.environment_variables_secret_refs
+            ],
+            ports=[
+                client.V1ContainerPort(
+                    name="http",
+                    container_port=endpoint_orm.invoke_port,
+                ),
+            ],
+            readiness_probe=client.V1Probe(
+                http_get=client.V1HTTPGetAction(
+                    path=endpoint_orm.health_check_path,
+                    port=endpoint_orm.invoke_port,
+                ),
+                initial_delay_seconds=endpoint_orm.health_check_interval,
+                period_seconds=endpoint_orm.health_check_interval,
+                timeout_seconds=endpoint_orm.health_check_timeout,
+                failure_threshold=10,
+                success_threshold=1,
+            ),
+            volume_mounts=[
+                client.V1VolumeMount(
+                    name="modeldir",
+                    mount_path="/opt/ml/model",
+                ),
+            ],
+        )
 
 
 class KubeSpawner(Spawner, DeploymentMixin):
@@ -76,19 +342,27 @@ class KubeSpawner(Spawner, DeploymentMixin):
         return status.ready_replicas or 0
 
     async def create(self, endpoint_orm: EndpointORM) -> None:
-        raise NotImplementedError
+        await self.make_and_apply_deployment(endpoint_orm)
 
-    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = False) -> None:
-        raise NotImplementedError
+    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = True) -> None:
+        await self.make_and_apply_deployment(endpoint_orm)
+        if need_restart:
+            await self.restart_deployment(endpoint_orm.endpoint_name)
 
     async def delete(self, endpoint_name: str) -> None:
-        raise NotImplementedError
+        await self.delete_deployment(endpoint_name)
 
     async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
-        raise NotImplementedError
+        status = await self.inspect_deployment_status(endpoint_name)
+        return EndpointRuntimeInfo(
+            total_node_nums=status.replicas or 0,
+            updated_node_nums=status.updated_replicas or 0,
+            avaliable_node_nums=status.ready_replicas or 0,
+            unavailable_node_nums=status.unavailable_replicas or 0,
+        )
 
     async def scale(self, endpoint_name: str, target_replicas: int) -> None:
-        raise NotImplementedError
+        await self.scale_deployment(endpoint_name, target_replicas)
 
 
 @hookimpl

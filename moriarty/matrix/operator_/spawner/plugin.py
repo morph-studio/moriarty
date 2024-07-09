@@ -63,15 +63,21 @@ def register(manager):
 
 class EndpointRuntimeInfo(FlexibleModel):
     total_node_nums: int
-    pending_node_nums: int
+    updated_node_nums: int
     avaliable_node_nums: int
-    error_node_nums: int
+    unavailable_node_nums: int
 
 
 class EnvironmentBuilder:
-    def build_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
+    model_s3_access_key_id = os.getenv(MODEL_S3_ACCESS_KEY_ID_ENV) or os.getenv("AWS_ACCESS_KEY_ID")
+    model_s3_secret_access_key = os.getenv(MODEL_S3_SECRET_ACCESS_KEY_ENV) or os.getenv(
+        "AWS_SECRET_ACCESS_KEY"
+    )
+    model_s3_endpoint_url = os.getenv(MODEL_S3_ENDPOINT_URL_ENV) or os.getenv("AWS_S3_ENDPOINT_URL")
+    model_aws_region_name = os.getenv(MODEL_AWS_REGION_ENV) or os.getenv("AWS_REGION_NAME")
+
+    def build_sidecar_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
         return {
-            **{str(k): str(v) for k, v in endpoint_orm.environment_variables.items()},
             **{
                 k: v
                 for k, v in {
@@ -100,8 +106,22 @@ class EnvironmentBuilder:
             },
         }
 
+    def build_compute_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
+        return {
+            **{str(k): str(v) for k, v in endpoint_orm.environment_variables.items()},
+        }
 
-class Spawner(EnvironmentBuilder):
+    def build_init_environment(self) -> dict[str, str]:
+        return {
+            "AWS_ACCESS_KEY_ID": self.model_s3_access_key_id,
+            "AWS_SECRET_ACCESS_KEY": self.model_s3_secret_access_key,
+            "AWS_S3_ENDPOINT_URL": self.model_s3_endpoint_url,
+            "AWS_REGION_NAME": self.model_aws_region_name,
+            "S3_ENDPOINT_URL": self.model_s3_endpoint_url,
+        }
+
+
+class Spawner:
     register_name: str
 
     async def prepare(self) -> None:
@@ -113,7 +133,7 @@ class Spawner(EnvironmentBuilder):
     async def create(self, endpoint_orm: EndpointORM) -> None:
         raise NotImplementedError
 
-    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = False) -> None:
+    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = True) -> None:
         raise NotImplementedError
 
     async def delete(self, endpoint_name: str) -> None:

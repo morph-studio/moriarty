@@ -12,11 +12,13 @@ class ResourceScope(FlexibleModel):
     memory_request: Optional[float] = None
     memory_limit: Optional[float] = None
     gpu_nums: Optional[int] = None
+    gpu_type: Optional[str] = None
 
 
 class ScheduleScope(FlexibleModel):
     node_labels: Optional[dict] = None
     node_affinity: Optional[dict] = None
+    pod_labels: Optional[dict] = None
 
 
 class ContainerScope(FlexibleModel):
