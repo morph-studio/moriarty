@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pluggy
 
+from moriarty.envs import *
 from moriarty.matrix.operator_.orm import EndpointORM
 from moriarty.tools import FlexibleModel
 
@@ -62,9 +63,68 @@ def register(manager):
 
 class EndpointRuntimeInfo(FlexibleModel):
     total_node_nums: int
-    pending_node_nums: int
+    updated_node_nums: int
     avaliable_node_nums: int
-    error_node_nums: int
+    unavailable_node_nums: int
+
+
+class EnvironmentBuilder:
+    model_s3_access_key_id = os.getenv(MODEL_S3_ACCESS_KEY_ID_ENV) or os.getenv("AWS_ACCESS_KEY_ID")
+    model_s3_secret_access_key = os.getenv(MODEL_S3_SECRET_ACCESS_KEY_ENV) or os.getenv(
+        "AWS_SECRET_ACCESS_KEY"
+    )
+    model_s3_endpoint_url = os.getenv(MODEL_S3_ENDPOINT_URL_ENV) or os.getenv("AWS_S3_ENDPOINT_URL")
+    model_aws_region_name = os.getenv(MODEL_AWS_REGION_ENV) or os.getenv("AWS_REGION_NAME")
+
+    def build_sidecar_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
+        return {
+            **{
+                k: str(v)
+                for k, v in {
+                    # For brq
+                    REDIS_URL_ENV: os.getenv(REDIS_URL_ENV),
+                    REDIS_HOST_ENV: os.getenv(REDIS_HOST_ENV),
+                    REDIS_PORT_ENV: os.getenv(REDIS_PORT_ENV),
+                    REDIS_DB_ENV: os.getenv(REDIS_DB_ENV),
+                    REDIS_CLUSTER_ENV: os.getenv(REDIS_CLUSTER_ENV),
+                    REDIS_TLS_ENV: os.getenv(REDIS_TLS_ENV),
+                    REDIS_USERNAME_ENV: os.getenv(REDIS_USERNAME_ENV),
+                    REDIS_PASSWORD_ENV: os.getenv(REDIS_PASSWORD_ENV),
+                    # For sidecar
+                    ENDPOINT_NAME_ENV: endpoint_orm.endpoint_name,
+                    INVOKE_HOST_ENV: "localhost",
+                    INVOKE_PORT_ENV: endpoint_orm.invoke_port,
+                    INVOKE_PATH_ENV: endpoint_orm.invoke_path,
+                    HEALTH_CHECK_PATH_ENV: endpoint_orm.health_check_path,
+                    ENABLE_RETRY_ENV: endpoint_orm.allow_retry,
+                    CONCURRENCY_ENV: endpoint_orm.concurrency,
+                    PROCESS_TIMEOUT_ENV: endpoint_orm.process_timeout,
+                    HEALTH_CHECK_TIMEOUT_ENV: endpoint_orm.health_check_timeout,
+                    HEALTH_CHECK_INTERVAL_ENV: endpoint_orm.health_check_interval,
+                }.items()
+                if v is not None
+            },
+        }
+
+    def build_compute_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
+        return {
+            **{str(k): str(v) for k, v in endpoint_orm.environment_variables.items()},
+        }
+
+    def build_init_environment(self) -> dict[str, str]:
+        return {
+            **{
+                k: str(v)
+                for k, v in {
+                    "AWS_ACCESS_KEY_ID": self.model_s3_access_key_id,
+                    "AWS_SECRET_ACCESS_KEY": self.model_s3_secret_access_key,
+                    "AWS_S3_ENDPOINT_URL": self.model_s3_endpoint_url,
+                    "AWS_REGION_NAME": self.model_aws_region_name,
+                    "S3_ENDPOINT_URL": self.model_s3_endpoint_url,
+                }.items()
+                if v is not None
+            },
+        }
 
 
 class Spawner:
@@ -79,7 +139,7 @@ class Spawner:
     async def create(self, endpoint_orm: EndpointORM) -> None:
         raise NotImplementedError
 
-    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = False) -> None:
+    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = True) -> None:
         raise NotImplementedError
 
     async def delete(self, endpoint_name: str) -> None:

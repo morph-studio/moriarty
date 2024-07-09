@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete
 
 from moriarty import mock
-from moriarty.matrix.envs import get_bridge_name, get_spawner_name
+from moriarty.envs import get_bridge_name, get_spawner_name
 from moriarty.matrix.job_manager.bridge_wrapper import get_bridge_manager
 from moriarty.matrix.operator_.callback_app import app as APP
 from moriarty.matrix.operator_.cli import drop

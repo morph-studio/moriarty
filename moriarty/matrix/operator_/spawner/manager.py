@@ -9,9 +9,9 @@ from typing import Any
 import pluggy
 from fastapi import Depends
 
+from moriarty.envs import get_spawner_name
 from moriarty.exceptions import PluginInitializationError, PluginNotFoundError
 from moriarty.log import logger
-from moriarty.matrix.envs import get_spawner_name
 from moriarty.matrix.operator_.spawner import impl, plugin
 
 

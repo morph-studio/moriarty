@@ -17,10 +17,13 @@ jobs:
         steps:
             - name: Create k8s Kind Cluster
               uses: helm/kind-action@v1
-            # This makes all service account as a cluster admin
+              with:
+                  cluster_name: moriarty-testing
+            # This makes all service account as a cluster admin and creates moriarty namespace
             - name: Create service account
               run: |
                   kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts
+                  kubectl create ns moriarty
             - uses: actions/checkout@v4
             - name: Set up Python ${{ matrix.python-version }}
               uses: actions/setup-python@v5

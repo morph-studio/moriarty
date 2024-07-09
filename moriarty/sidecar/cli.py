@@ -1,10 +1,9 @@
 import click
 from brq.tools import get_redis_client, get_redis_url
 
+from moriarty.envs import *
 from moriarty.sidecar.consumer import InferencerConsumer
 from moriarty.tools import coro
-
-from .envs import *
 
 
 @click.command()
@@ -126,14 +125,14 @@ from .envs import *
     required=False,
     help="Healthy check timeout",
     type=int,
-    envvar=HEALTHY_CHECK_TIMEOUT_ENV,
+    envvar=HEALTH_CHECK_TIMEOUT_ENV,
 )
 @click.option(
     "--healthy-check-interval",
     required=False,
     help="Healthy check interval",
     type=int,
-    envvar=HEALTHY_CHECK_INTERVAL_ENV,
+    envvar=HEALTH_CHECK_INTERVAL_ENV,
 )
 @coro
 async def start(
@@ -154,8 +153,8 @@ async def start(
     enable_ssl,
     concurrency,
     process_timeout,
-    healthy_check_timeout,
-    healthy_check_interval,
+    health_check_timeout,
+    health_check_interval,
 ):
     """
     Start moriarty sidecar and run forever
@@ -180,8 +179,8 @@ async def start(
             "enable_ssl": enable_ssl,
             "concurrency": concurrency,
             "process_timeout": process_timeout,
-            "healthy_check_timeout": healthy_check_timeout,
-            "healthy_check_interval": healthy_check_interval,
+            "health_check_timeout": health_check_timeout,
+            "health_check_interval": health_check_interval,
         }.items()
         if v is not None
     }

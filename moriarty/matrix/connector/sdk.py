@@ -4,9 +4,9 @@ from urllib.parse import urljoin
 
 import httpx
 
+from moriarty.envs import MORIARTY_CONNECTOR_ENDPOINT_ENV
 from moriarty.log import logger
 from moriarty.matrix.connector.params import InvokeParams
-from moriarty.matrix.envs import MORIARTY_CONNECTOR_ENDPOINT_ENV
 
 
 async def invoke(

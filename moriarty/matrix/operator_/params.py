@@ -12,11 +12,13 @@ class ResourceScope(FlexibleModel):
     memory_request: Optional[float] = None
     memory_limit: Optional[float] = None
     gpu_nums: Optional[int] = None
+    gpu_type: Optional[str] = None
 
 
 class ScheduleScope(FlexibleModel):
     node_labels: Optional[dict] = None
     node_affinity: Optional[dict] = None
+    pod_labels: Optional[dict] = None
 
 
 class ContainerScope(FlexibleModel):
@@ -32,8 +34,8 @@ class ContainerScope(FlexibleModel):
 class SidecarScope(FlexibleModel):
     concurrency: Optional[int] = 1
     process_timeout: Optional[int] = 3600
-    healthy_check_timeout: Optional[int] = 1200
-    healthy_check_interval: Optional[int] = 5
+    health_check_timeout: Optional[int] = 1200
+    health_check_interval: Optional[int] = 5
 
 
 class CreateEndpointParams(FlexibleModel):

@@ -3,8 +3,8 @@ import uuid
 
 from fastapi import Depends
 
+from moriarty.envs import get_bridge_name
 from moriarty.matrix.connector.params import InvokeParams, InvokeResponse
-from moriarty.matrix.envs import get_bridge_name
 from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper, get_bridge_wrapper
 from moriarty.matrix.job_manager.params import InferenceJob
 

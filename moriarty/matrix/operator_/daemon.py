@@ -5,8 +5,8 @@ import signal
 import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from moriarty.envs import get_bridge_name
 from moriarty.log import logger
-from moriarty.matrix.envs import get_bridge_name
 from moriarty.matrix.job_manager.bridge_wrapper import (
     get_bridge_manager,
     get_bridge_wrapper,

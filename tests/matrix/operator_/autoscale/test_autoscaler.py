@@ -18,7 +18,7 @@ async def autoscaler(
     autoscaler = AutoscalerManager(
         redis_client=async_redis_client, session=async_session, spawner=spawner
     )
-    autoscaler.count_pending_jobs = count_pending_jobs
+    autoscaler.metrics_manager.count_pending_jobs = count_pending_jobs
     yield autoscaler
 
 

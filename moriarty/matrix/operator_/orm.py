@@ -43,7 +43,7 @@ class EndpointORM(Base):
         comment="Updated at",
     )
     queue_capacity = Column(Integer, nullable=False, default=5)
-    image = Column(String(255), nullable=True)
+    image = Column(String(255), nullable=True, default="wh1isper/moriarty-compute-image:latest")
     model_path = Column(
         Text,
         nullable=True,
@@ -57,11 +57,12 @@ class EndpointORM(Base):
     )
 
     # Resource spec
-    cpu_request = Column(Float, nullable=False, default=0.1, comment="CPU request in milli")
+    cpu_request = Column(Float, nullable=False, default=0.1, comment="CPU request in cores")
     cpu_limit = Column(Float, nullable=True, comment="CPU limit in milli")
     memory_request = Column(Float, nullable=False, default=128.0, comment="Memory request in MB")
     memory_limit = Column(Float, nullable=True, comment="Memory limit in MB")
     gpu_nums = Column(Integer, nullable=False, default=0)
+    gpu_type = Column(String(255), nullable=False, default="nvidia.com/gpu")
 
     # Config for container
     environment_variables = Column(JSON, nullable=False, default={})
@@ -71,16 +72,17 @@ class EndpointORM(Base):
     invoke_port = Column(Integer, nullable=False, default=8080)
     invoke_path = Column(String(255), nullable=False, default="/invocations")
     health_check_path = Column(String(255), nullable=False, default="/ping")
-
+    allow_retry = Column(Boolean, nullable=False, default=False)
     # Schedule
     node_labels = Column(JSON, nullable=False, default={})
     node_affinity = Column(JSON, nullable=False, default={})
+    pod_labels = Column(JSON, nullable=False, default={})
 
     # Config for sidecar
     concurrency = Column(Integer, nullable=False, default=1)
     process_timeout = Column(Integer, nullable=False, default=3600)
-    healthy_check_timeout = Column(Integer, nullable=False, default=1200)
-    healthy_check_interval = Column(Integer, nullable=False, default=5)
+    health_check_timeout = Column(Integer, nullable=False, default=1200)
+    health_check_interval = Column(Integer, nullable=False, default=5)
 
 
 class InferenceLogORM(Base):
