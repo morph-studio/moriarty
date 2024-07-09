@@ -1,9 +1,67 @@
 from __future__ import annotations
 
+import math
+from functools import cached_property
+
+import redis.asyncio as redis
+from pydantic import BaseModel
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from moriarty.matrix.operator_.enums_ import MetricType
 from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM
+from moriarty.matrix.operator_.spawner import plugin
+from moriarty.sidecar.producer import JobProducer
+
+
+class EndpointMetrics(BaseModel):
+    endpoint_name: str
+    metrics: dict[MetricType, float] = dict()
+
+
+class MetricsManager:
+    def __init__(self, spawner: plugin.Spawner, redis_client: redis.Redis) -> None:
+        self.spawner = spawner
+        self.redis_client = redis_client
+
+    @cached_property
+    def job_producer(self) -> JobProducer:
+        return JobProducer(redis_client=self.redis_client)
+
+    async def count_pending_jobs(self, endpoint_name: str) -> int:
+        return await self.job_producer.count_unprocessed_jobs(endpoint_name=endpoint_name)
+
+    async def get_metrics(self, endpoint_name: str) -> EndpointMetrics:
+        unprocessed_count = await self.count_pending_jobs(endpoint_name)
+        replicas = max(1, await self.spawner.count_avaliable_instances(endpoint_name))
+        return EndpointMetrics(
+            endpoint_name=endpoint_name,
+            metrics={
+                MetricType.pending_jobs: unprocessed_count,
+                MetricType.pending_jobs_per_instance: unprocessed_count / replicas,
+            },
+        )
+
+    def calculate_least_replicas(
+        self,
+        metric: MetricType,
+        current_metric_value: float | int,
+        metric_threshold: float,
+    ) -> int:
+        if metric == MetricType.pending_jobs:
+            return int(current_metric_value - int(metric_threshold))
+        if metric == MetricType.pending_jobs_per_instance:
+            if metric_threshold == 0:
+                metric_threshold = 1
+            return math.ceil(current_metric_value / metric_threshold)
+
+        raise NotImplementedError
+
+    def calculate_queue_capacity(self, autoscaler: AutoscalerORM) -> int:
+        if autoscaler.metric == MetricType.pending_jobs:
+            return autoscaler.metrics_threshold + autoscaler.max_replicas + 1
+        if autoscaler.metric == MetricType.pending_jobs_per_instance:
+            return math.ceil(autoscaler.metrics_threshold) * autoscaler.max_replicas + 1
 
 
 class EndpointMixin:

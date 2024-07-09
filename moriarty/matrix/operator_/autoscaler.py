@@ -12,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from moriarty.log import logger
 from moriarty.matrix.operator_.dbutils import get_db_session
 from moriarty.matrix.operator_.enums_ import MetricType
-from moriarty.matrix.operator_.mixin import AutoscaleMixin, EndpointMixin
+from moriarty.matrix.operator_.mixin import (
+    AutoscaleMixin,
+    EndpointMetrics,
+    EndpointMixin,
+    MetricsManager,
+)
 from moriarty.matrix.operator_.orm import AutoscaleLogORM, AutoscalerORM, EndpointORM
 from moriarty.matrix.operator_.params import (
     AutoscaleLog,
@@ -32,49 +37,6 @@ def get_autoscaler_manager(
     session=Depends(get_db_session),
 ):
     return AutoscalerManager(redis_client=redis_client, session=session, spawner=spawner)
-
-
-class EndpointMetrics(BaseModel):
-    endpoint_name: str
-    metrics: dict[MetricType, float] = dict()
-
-
-class MetricsMixin:
-    spawner: plugin.Spawner
-    redis_client: redis.Redis | redis.RedisCluster
-
-    @cached_property
-    def job_producer(self) -> JobProducer:
-        return JobProducer(redis_client=self.redis_client)
-
-    async def count_pending_jobs(self, endpoint_name: str) -> int:
-        return await self.job_producer.count_unprocessed_jobs(endpoint_name=endpoint_name)
-
-    async def get_metrics(self, endpoint_name: str) -> EndpointMetrics:
-        unprocessed_count = await self.count_pending_jobs(endpoint_name)
-        replicas = max(1, await self.spawner.count_avaliable_instances(endpoint_name))
-        return EndpointMetrics(
-            endpoint_name=endpoint_name,
-            metrics={
-                MetricType.pending_jobs: unprocessed_count,
-                MetricType.pending_jobs_per_instance: unprocessed_count / replicas,
-            },
-        )
-
-    def calculate_least_replicas(
-        self,
-        metric: MetricType,
-        current_metric_value: float | int,
-        metric_threshold: float,
-    ) -> int:
-        if metric == MetricType.pending_jobs:
-            return int(current_metric_value - int(metric_threshold))
-        if metric == MetricType.pending_jobs_per_instance:
-            if metric_threshold == 0:
-                metric_threshold = 1
-            return math.ceil(current_metric_value / metric_threshold)
-
-        raise NotImplementedError
 
 
 class CooldownMixin(AutoscaleMixin):
@@ -121,7 +83,7 @@ class CooldownMixin(AutoscaleMixin):
         await self.redis_client.delete(scaleout_key, scalein_key)
 
 
-class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
+class AutoscalerManager(EndpointMixin, CooldownMixin):
     def __init__(
         self,
         redis_client: redis.Redis | redis.RedisCluster,
@@ -131,6 +93,7 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
         self.redis_client = redis_client
         self.session = session
         self.spawner = spawner
+        self.metrics_manager = MetricsManager(spawner=spawner, redis_client=redis_client)
 
     async def _clean_not_exist_endpoint(self) -> None:
         logger.debug("Cleaning not exist endpoint...")
@@ -148,7 +111,7 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
             logger.warning(f"Autoscaler not found: {endpoint_name}, may be deleted?")
             return
 
-        metrics = await self.get_metrics(endpoint_name)
+        metrics = await self.metrics_manager.get_metrics(endpoint_name)
         target_replicas = await self._calculate_target_replicas(endpoint_name, metrics)
         if target_replicas is None or await self._is_cooldown(endpoint_name, target_replicas):
             return
@@ -218,7 +181,7 @@ class AutoscalerManager(MetricsMixin, EndpointMixin, CooldownMixin):
             )
             return None
 
-        least_replicas = self.calculate_least_replicas(
+        least_replicas = self.metrics_manager.calculate_least_replicas(
             metric=autoscaler_orm.metrics,
             current_metric_value=current_metric,
             metric_threshold=autoscaler_orm.metrics_threshold,

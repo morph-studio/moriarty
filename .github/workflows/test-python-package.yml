@@ -17,6 +17,8 @@ jobs:
         steps:
             - name: Create k8s Kind Cluster
               uses: helm/kind-action@v1
+              with:
+                  cluster_name: moriarty-testing
             # This makes all service account as a cluster admin
             - name: Create service account
               run: |

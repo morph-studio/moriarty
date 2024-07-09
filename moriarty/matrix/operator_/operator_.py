@@ -18,7 +18,11 @@ from moriarty.matrix.operator_.autoscaler import (
     get_autoscaler_manager,
 )
 from moriarty.matrix.operator_.dbutils import get_db_session
-from moriarty.matrix.operator_.mixin import EndpointMixin
+from moriarty.matrix.operator_.mixin import (
+    AutoscaleMixin,
+    EndpointMixin,
+    MetricsManager,
+)
 from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM, InferenceLogORM
 from moriarty.matrix.operator_.params import (
     ContainerScope,
@@ -70,7 +74,7 @@ async def get_operaotr(
     )
 
 
-class Bridger(EndpointMixin):
+class Bridger(EndpointMixin, AutoscaleMixin):
     def __init__(
         self,
         spawner: plugin.Spawner,
@@ -87,6 +91,11 @@ class Bridger(EndpointMixin):
         self.session = session
         self.bridge_result_queue_url = bridge_result_queue_url
 
+        self.metrics_manager = MetricsManager(
+            spawner=spawner,
+            redis_client=self.redis_client,
+        )
+
     @cached_property
     def job_producer(self) -> JobProducer:
         return JobProducer(redis_client=self.redis_client)
@@ -100,13 +109,19 @@ class Bridger(EndpointMixin):
         if endpoint_orm is None:
             logger.warning(f"Endpoint not found: {endpoint_name}, may be deleted?")
             return False
-        concurrency = endpoint_orm.concurrency
+
         pending_count = await self.job_producer.count_unprocessed_jobs(endpoint_name)
-        return (
-            pending_count
-            < endpoint_orm.queue_capacity
-            + await self.spawner.count_avaliable_instances(endpoint_name) * concurrency
-        )
+        autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
+        if not autoscaler_orm:
+            # No autoscaler, use default behavior
+            concurrency = endpoint_orm.concurrency
+            return (
+                pending_count
+                < endpoint_orm.queue_capacity
+                + await self.spawner.count_avaliable_instances(endpoint_name) * concurrency
+            )
+        else:
+            return pending_count < self.metrics_manager.calculate_queue_capacity(autoscaler_orm)
 
     async def bridge_one(self, endpoint_name: str) -> None:
         async def _warp_produce_job(job: InferenceJob) -> None:
