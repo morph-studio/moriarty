@@ -79,7 +79,7 @@ class EnvironmentBuilder:
     def build_sidecar_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
         return {
             **{
-                k: v
+                k: str(v)
                 for k, v in {
                     # For brq
                     REDIS_URL_ENV: os.getenv(REDIS_URL_ENV),

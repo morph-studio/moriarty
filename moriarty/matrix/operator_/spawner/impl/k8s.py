@@ -33,7 +33,7 @@ class DeploymentMixin(EnvironmentBuilder):
 
     def _escape_string(self, s: str) -> str:
         safe_chars = set(string.ascii_lowercase + string.digits)
-        return escapism.escape(s, safe=safe_chars, escape_char="-")
+        return escapism.escape(s, safe=safe_chars, escape_char="-").lower()
 
     def get_deployment_name(self, endpoint_name: str) -> str:
         # Escape the endpoint name
@@ -60,7 +60,23 @@ class DeploymentMixin(EnvironmentBuilder):
 
     async def make_and_apply_deployment(self, endpoint_orm: EndpointORM) -> None:
         deployment = self._make_deployment(endpoint_orm)
-        await self._apply_deployment(deployment)
+        try:
+            await self._apply_deployment(deployment)
+        except client.rest.ApiException as e:
+            logger.error(
+                f"Apply deployment failed: {e}. Input: {client.ApiClient().sanitize_for_serialization(deployment)}"
+            )
+            raise
+
+    async def make_and_update_deployment(self, endpoint_orm: EndpointORM) -> None:
+        deployment = self._make_deployment(endpoint_orm)
+        try:
+            await self._replace_deployment(deployment)
+        except client.rest.ApiException as e:
+            logger.error(
+                f"Update deployment failed: {e}. Input: {client.ApiClient().sanitize_for_serialization(deployment)}"
+            )
+            raise
 
     async def delete_deployment(self, endpoint_name: str) -> None:
         deployment_name = self.get_deployment_name(endpoint_name)
@@ -101,6 +117,13 @@ class DeploymentMixin(EnvironmentBuilder):
             v1 = client.AppsV1Api(api)
             await v1.create_namespaced_deployment(namespace=self.namespace, body=deployment)
 
+    async def _replace_deployment(self, deployment: client.V1Deployment) -> None:
+        async with ApiClient() as api:
+            v1 = client.AppsV1Api(api)
+            await v1.replace_namespaced_deployment(
+                name=deployment.metadata.name, namespace=self.namespace, body=deployment
+            )
+
     def _make_deployment(
         self,
         endpoint_orm: EndpointORM,
@@ -116,63 +139,82 @@ class DeploymentMixin(EnvironmentBuilder):
         deployment.metadata.name = deployment_name
         deployment.metadata.namespace = self.namespace
         deployment.metadata.labels = {
-            "moriarty/version": __version__,
-            "moriarty/kubespawner/version": __version__,
-            "moriarty/kubespawner/gpu-nums": str(endpoint_orm.gpu_nums or 0),
-            "moriarty/kubespawner/gpu-type": str(endpoint_orm.gpu_type or ""),
+            "moriarty.version": __version__,
+            "moriarty.kubespawner.version": __version__,
+            "moriarty.kubespawner.gpu_nums": str(endpoint_orm.gpu_nums or 0),
+            "moriarty.kubespawner.gpu_type": str(endpoint_orm.gpu_type or "").replace("/", "."),
         }
 
-        deployment.spec = client.V1DeploymentSpec()
-        deployment.spec.replicas = endpoint_orm.replicas
-        deployment.spec.selector = client.V1LabelSelector()
-        deployment.spec.selector.match_labels = {
-            str(k): str(v) for k, v in endpoint_orm.node_labels.items()
-        }
-        deployment.spec.template = client.V1PodTemplateSpec()
-        deployment.spec.template.metadata = client.V1ObjectMeta()
-        deployment.spec.template.metadata.labels = {
-            str(k): str(v) for k, v in endpoint_orm.pod_labels.items()
-        }
-
-        deployment.spec.template.spec = client.V1PodSpec()
-        deployment.spec.template.spec.restart_policy = "Always"
-        deployment.spec.template.spec.affinity = client.V1Affinity(
-            node_affinity=client.V1NodeAffinity(
-                required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
-                    node_selector_terms=[
-                        client.V1NodeSelectorTerm(
-                            match_expressions=[
-                                {
-                                    "key": k,
-                                    "operator": "In",
-                                    "values": v,
-                                }
-                                for k, v in endpoint_orm.node_affinity.items()
-                            ]
-                        )
-                    ]
-                )
-            )
-        )
-
-        deployment.spec.template.spec.init_containers = [self._make_init_container(endpoint_orm)]
-        deployment.spec.template.spec.containers = [
-            self._make_sidecar_container(endpoint_orm),
-            self._make_compute_contaienr(endpoint_orm),
-        ]
-        deployment.spec.template.spec.volumes = [
-            client.V1Volume(
-                name="modeldir",
-                empty_dir=client.V1EmptyDirVolumeSource(),
+        deployment.spec = client.V1DeploymentSpec(
+            replicas=endpoint_orm.replicas,
+            selector=client.V1LabelSelector(
+                match_labels={
+                    "app": "moriarty",
+                    "moriarty.endpoint": endpoint_orm.endpoint_name,
+                }
             ),
-        ]
-
-        if self.image_pull_secrets:
-            deployment.spec.template.spec.image_pull_secrets = [
-                client.V1LocalObjectReference(
-                    name=self.image_pull_secrets,
-                )
-            ]
+            template=client.V1PodTemplateSpec(
+                metadata=client.V1ObjectMeta(
+                    labels={
+                        "app": "moriarty",
+                        "moriarty.endpoint": endpoint_orm.endpoint_name,
+                        **{str(k): str(v) for k, v in endpoint_orm.pod_labels.items()},
+                    },
+                ),
+                spec=client.V1PodSpec(
+                    restart_policy="Always",
+                    affinity=(
+                        client.V1Affinity(
+                            node_affinity=client.V1NodeAffinity(
+                                required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
+                                    node_selector_terms=[
+                                        client.V1NodeSelectorTerm(
+                                            match_expressions=[
+                                                {
+                                                    "key": k,
+                                                    "operator": "In",
+                                                    "values": v,
+                                                }
+                                                for k, v in endpoint_orm.node_affinity.items()
+                                            ]
+                                        )
+                                    ]
+                                )
+                            )
+                        )
+                        if endpoint_orm.node_affinity
+                        else None
+                    ),
+                    node_selector=(
+                        client.V1NodeSelector(
+                            match_labels={k: v for k, v in endpoint_orm.node_labels.items() if v}
+                        )
+                        if endpoint_orm.node_labels
+                        else None
+                    ),
+                    init_containers=[self._make_init_container(endpoint_orm)],
+                    containers=[
+                        self._make_sidecar_container(endpoint_orm),
+                        self._make_compute_contaienr(endpoint_orm),
+                    ],
+                    volumes=[
+                        client.V1Volume(
+                            name="modeldir",
+                            empty_dir=client.V1EmptyDirVolumeSource(),
+                        ),
+                    ],
+                    image_pull_secrets=(
+                        [
+                            client.V1LocalObjectReference(
+                                name=self.image_pull_secrets,
+                            )
+                        ]
+                        if self.image_pull_secrets
+                        else None
+                    ),
+                ),
+            ),
+        )
 
         return deployment
 
@@ -187,14 +229,14 @@ class DeploymentMixin(EnvironmentBuilder):
             "/opt/ml/model",
         ]
 
-        if endpoint_orm.model_dir:
-            if endpoint_orm.model_dir.endswith("/"):
+        if endpoint_orm.model_path:
+            if endpoint_orm.model_path.endswith("/"):
                 command.extend(
                     [
                         "&&",
                         "s5cmd",
                         "cp",
-                        f"{endpoint_orm.model_dir}/*",
+                        f"{endpoint_orm.model_path}/*",
                         "/opt/ml/model/",
                     ]
                 )
@@ -204,7 +246,7 @@ class DeploymentMixin(EnvironmentBuilder):
                         "&&",
                         "s5cmd",
                         "cp",
-                        endpoint_orm.model_dir,
+                        endpoint_orm.model_path,
                         "/opt/ml/model/",
                     ]
                 )
@@ -219,11 +261,11 @@ class DeploymentMixin(EnvironmentBuilder):
                 "/opt/ml/model",
             ]
         )
-
         return client.V1Container(
             name="init",
             image=self.init_image,
-            command=command,
+            command=["/bin/sh"],
+            args=["-c", " ".join(command)],
             volume_mounts=[
                 client.V1VolumeMount(
                     name="modeldir",
@@ -262,15 +304,25 @@ class DeploymentMixin(EnvironmentBuilder):
         self,
         endpoint_orm: EndpointORM,
     ) -> client.V1Container:
+        cpu_limit = {}
+        memory_limit = {}
         gpu_limit = {}
         if endpoint_orm.gpu_nums:
             gpu_limit = {
-                endpoint_orm.gpu_type: endpoint_orm.gpu_nums,
+                endpoint_orm.gpu_type: f"{endpoint_orm.gpu_nums}",
+            }
+        if endpoint_orm.cpu_limit:
+            cpu_limit = {
+                "cpu": f"{endpoint_orm.cpu_limit}",
+            }
+        if endpoint_orm.memory_limit:
+            memory_limit = {
+                "memory": f"{endpoint_orm.memory_limit}Mi",
             }
 
         return client.V1Container(
             name="compute",
-            image=self.compute_image,
+            image=endpoint_orm.image,
             command=endpoint_orm.commands,
             args=endpoint_orm.args,
             resources=client.V1ResourceRequirements(
@@ -279,8 +331,8 @@ class DeploymentMixin(EnvironmentBuilder):
                     "memory": f"{endpoint_orm.memory_request}Mi",
                 },
                 limits={
-                    "cpu": f"{endpoint_orm.cpu_limit}",
-                    "memory": f"{endpoint_orm.memory_limit}Mi",
+                    **cpu_limit,
+                    **memory_limit,
                     **gpu_limit,
                 },
             ),
@@ -345,7 +397,7 @@ class KubeSpawner(Spawner, DeploymentMixin):
         await self.make_and_apply_deployment(endpoint_orm)
 
     async def update(self, endpoint_orm: EndpointORM, need_restart: bool = True) -> None:
-        await self.make_and_apply_deployment(endpoint_orm)
+        await self.make_and_update_deployment(endpoint_orm)
         if need_restart:
             await self.restart_deployment(endpoint_orm.endpoint_name)
 
