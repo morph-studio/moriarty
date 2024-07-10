@@ -1,0 +1,35 @@
+{
+    "endpoint_name": "hello-world",
+    "image": "wh1isper/moriarty-compute-image:latest",
+    "model_path": null,
+    "queue_capacity": 5,
+    "replicas": 1,
+    "resource": {
+        "cpu_request": null,
+        "cpu_limit": null,
+        "memory_request": null,
+        "memory_limit": null,
+        "gpu_nums": null,
+        "gpu_type": null
+    },
+    "schedule": {
+        "node_labels": null,
+        "node_affinity": null,
+        "pod_labels": null
+    },
+    "container": {
+        "environment_variables": null,
+        "environment_variables_secret_refs": null,
+        "commands": null,
+        "args": null,
+        "invoke_port": 8080,
+        "invoke_path": "/invocations",
+        "health_check_path": "/ping"
+    },
+    "sidecar": {
+        "concurrency": 1,
+        "process_timeout": 3600,
+        "health_check_timeout": 1200,
+        "health_check_interval": 5
+    }
+}

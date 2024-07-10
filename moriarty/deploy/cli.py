@@ -2,8 +2,10 @@ import click
 
 from moriarty.envs import MORIARTY_MATRIX_API_URL_ENV, MORIARTY_MATRIX_TOKEN_ENV
 from moriarty.matrix.operator_.enums_ import MetricType
+from moriarty.matrix.operator_.params import CreateEndpointParams, UpdateEndpointParams
 
 from .sdk import (
+    request_create_endpoint_with_params,
     request_delete_autoscale,
     request_delete_endpoint,
     request_query_autoscale,
@@ -11,7 +13,7 @@ from .sdk import (
     request_scan_autoscale_log,
     request_scan_endpoint,
     request_set_autoscale,
-    request_update_endpoint,
+    request_update_endpoint_with_params,
 )
 
 
@@ -133,8 +135,8 @@ def query(
 
 @click.command()
 @click.option(
-    "--endpoint-name",
-    help="Endpoint name",
+    "--endpoint-config-file",
+    help="Endpoint config file",
     type=str,
     required=True,
 )
@@ -153,42 +155,26 @@ def query(
 )
 def deploy(
     api_url,
-    endpoint_name,
-    image,
-    model_path,
-    queue_capacity,
-    replicas,
-    # ResourceScope
-    cpu_request,
-    cpu_limit,
-    memory_request,
-    memory_limit,
-    gpu_nums,
-    gpu_type,
-    # ScheduleScope
-    node_labels,
-    node_affinity,
-    pod_labels,
-    # ContainerScope
-    environment_variables,
-    environment_variables_secret_refs,
-    commands,
-    args,
-    invoke_port,
-    invoke_path,
-    health_check_path,
-    # SidecarScope
-    concurrency,
-    process_timeout,
-    health_check_timeout,
-    health_check_interval,
+    endpoint_config_file,
     token,
 ):
-    pass
+    with open(endpoint_config_file) as f:
+        params: CreateEndpointParams = CreateEndpointParams.model_validate_json(
+            f.read(),
+        )
+
+    request_create_endpoint_with_params(api_url=api_url, params=params, token=token)
+    print(f"Created endpoint: {params.endpoint_name}")
 
 
 @click.command()
 @click.argument("endpoint_name")
+@click.option(
+    "--endpoint-config-file",
+    help="Endpoint config file",
+    type=str,
+    required=True,
+)
 @click.option(
     "--api-url",
     help="Moriarty Operator API URL",
@@ -205,40 +191,27 @@ def deploy(
 def update(
     api_url,
     endpoint_name,
-    image,
-    model_path,
-    queue_capacity,
-    replicas,
-    # ResourceScope
-    cpu_request,
-    cpu_limit,
-    memory_request,
-    memory_limit,
-    gpu_nums,
-    gpu_type,
-    # ScheduleScope
-    node_labels,
-    node_affinity,
-    pod_labels,
-    # ContainerScope
-    environment_variables,
-    environment_variables_secret_refs,
-    commands,
-    args,
-    invoke_port,
-    invoke_path,
-    health_check_path,
-    # SidecarScope
-    concurrency,
-    process_timeout,
-    health_check_timeout,
-    health_check_interval,
+    endpoint_config_file,
     token,
 ):
-    response = request_update_endpoint()
+    with open(endpoint_config_file) as f:
+        params: UpdateEndpointParams = UpdateEndpointParams.model_validate_json(
+            f.read(),
+        )
 
-    print(f"E")
-    print(request_update_endpoint)
+    autoscale = request_query_autoscale(endpoint_name=endpoint_name, api_url=api_url, token=token)
+    if autoscale:
+        print(f"{endpoint_name} has autoscale: {autoscale}, set replicas to None")
+        params.replicas = None
+
+    response = request_update_endpoint_with_params(
+        api_url=api_url,
+        endpoint_name=endpoint_name,
+        params=params,
+        token=token,
+    )
+    print(f"Updated endpoint: {endpoint_name}")
+    print(response)
 
 
 @click.command()

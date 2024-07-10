@@ -205,6 +205,45 @@ def request_set_autoscale(
     return QueryEndpointResponse.model_validate(response.json())
 
 
+def request_create_endpoint_with_params(
+    api_url,
+    params: CreateEndpointParams,
+    token: str = None,
+) -> None:
+    response = httpx.post(
+        urljoin(api_url, "/endpoint/create"),
+        headers=_make_headers(token),
+        data=params.model_dump_json(),
+        follow_redirects=True,
+    )
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError:
+        logger.error(f"Request error, response: {response.text}")
+        raise
+    return None
+
+
+def request_update_endpoint_with_params(
+    api_url,
+    endpoint_name: str,
+    params: UpdateEndpointParams,
+    token: str = None,
+) -> QueryEndpointResponse:
+    response = httpx.post(
+        urljoin(api_url, f"/endpoint/{endpoint_name}/update"),
+        headers=_make_headers(token),
+        data=params.model_dump_json(),
+        follow_redirects=True,
+    )
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError:
+        logger.error(f"Request error, response: {response.text}")
+        raise
+    return QueryEndpointResponse.model_validate(response.json())
+
+
 def request_create_endpoint(
     api_url: str,
     endpoint_name: str,
