@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: moriarty-operator
+  name: moriarty-operator-callback
   namespace: moriarty
 spec:
   selector:
-    app: moriarty-operator
+    app: moriarty-operator-callback
   ports:
-    - name: moriarty-operator
+    - name: moriarty-operator-callback
       port: 8999
 ---
 apiVersion: apps/v1
