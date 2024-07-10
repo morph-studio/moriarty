@@ -1,4 +1,4 @@
-FROM python:3.10.12-slim-bookworm as builder
+FROM python:3.10.12-slim-bookworm AS builder
 
 RUN pip install hatch
 COPY . /source
@@ -12,3 +12,6 @@ COPY --from=builder /source/dist/*.whl /tmp/
 RUN pip install --no-cache-dir $(echo /tmp/*.whl)
 
 ENV MORIARTY_LOG_LEVEL=INFO
+
+ENTRYPOINT [ "moriarty-sidecar" ]
+CMD [ "start" ]
