@@ -37,7 +37,7 @@ class DeploymentMixin(EnvironmentBuilder):
 
     def get_deployment_name(self, endpoint_name: str) -> str:
         # Escape the endpoint name
-        return self._escape_string(f"moriarty-{endpoint_name}")
+        return self._escape_string(f"endpoint-{endpoint_name}")
 
     async def inspect_deployment_status(
         self, endpoint_name: str
