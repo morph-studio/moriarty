@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /source/dist/*.whl /tmp/
 
-RUN pip install --no-cache-dir $(echo /tmp/*.whl)[service]
+RUN pip install --no-cache-dir $(echo /tmp/*.whl)[matrix]
 
 ENV MORIARTY_LOG_LEVEL=INFO
 
