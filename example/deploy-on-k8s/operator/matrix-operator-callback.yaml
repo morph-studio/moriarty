@@ -11,16 +11,17 @@ spec:
       port: 8999
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: moriarty-operator-callback
   namespace: moriarty
   labels:
     app: moriarty-operator-callback
 spec:
-  replicas: 1
-  strategy:
+  updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: moriarty-operator-callback

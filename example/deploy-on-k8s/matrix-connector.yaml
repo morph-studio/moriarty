@@ -11,14 +11,13 @@ spec:
       port: 8901
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: moriarty-connector
   namespace: moriarty
   labels:
     app: moriarty-connector
 spec:
-  replicas: 3
   strategy:
     type: RollingUpdate
   selector:
