@@ -33,7 +33,7 @@ class DeploymentMixin(EnvironmentBuilder):
 
     def _escape_string(self, s: str) -> str:
         safe_chars = set(string.ascii_lowercase + string.digits)
-        return escapism.escape(s, safe=safe_chars, escape_char="-").lower()
+        return escapism.escape(s, safe=safe_chars, escape_char="-", allow_collisions=True).lower()
 
     def get_deployment_name(self, endpoint_name: str) -> str:
         # Escape the endpoint name
