@@ -125,6 +125,14 @@ class Bridger(EndpointMixin, AutoscaleMixin):
 
     async def bridge_one(self, endpoint_name: str) -> None:
         async def _warp_produce_job(job: InferenceJob) -> None:
+            is_processed = (
+                await self.session.execute(
+                    select(InferenceLogORM).where(InferenceLogORM.inference_id == job.inference_id)
+                )
+            ).scalar_one_or_none() is not None
+            if is_processed:
+                return
+
             await self.job_producer.invoke(
                 endpoint_name,
                 params=job.payload,
