@@ -29,6 +29,7 @@ spec:
       labels:
         app: moriarty-operator-callback
     spec:
+      serviceAccountName: moriarty-operator
       containers:
         - name: moriarty-operator-callback
           image: wh1isper/moriarty

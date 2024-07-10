@@ -17,6 +17,7 @@ spec:
       labels:
         app: moriarty-operator-autoscaler
     spec:
+      serviceAccountName: moriarty-operator
       containers:
         - name: moriarty-operator-autoscaler
           image: wh1isper/moriarty

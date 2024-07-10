@@ -7,8 +7,14 @@ RUN hatch build
 
 FROM python:3.10.12-slim-bookworm
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tini \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /source/dist/*.whl /tmp/
 
 RUN pip install --no-cache-dir $(echo /tmp/*.whl)[service]
 
 ENV MORIARTY_LOG_LEVEL=INFO
+
+ENTRYPOINT [ "tini", "--" ]
