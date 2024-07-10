@@ -4,7 +4,7 @@ metadata:
   name: kubespawner
   namespace: moriarty
 data:
-  MORIARTY_KUBE_NAMESPACE_ENV: "moriarty"
+  MORIARTY_KUBE_NAMESPACE: "moriarty"
   # INIT_IMAGE:
   # SIDECAR_IMAGE:
   # IMAGE_PULL_SECRETS:
