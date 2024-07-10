@@ -11,7 +11,7 @@ async def load_kube_config() -> None:
         return
     try:
         logger.debug("Try to load in-cluster config")
-        await config.load_incluster_config()
+        config.load_incluster_config()
     except config.config_exception.ConfigException:
         logger.info("No in-cluster config, using default config location")
         await config.load_kube_config()
