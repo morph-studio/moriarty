@@ -121,16 +121,16 @@ from moriarty.tools import coro
     envvar=PROCESS_TIMEOUT_ENV,
 )
 @click.option(
-    "--healthy-check-timeout",
+    "--health-check-timeout",
     required=False,
-    help="Healthy check timeout",
+    help="Health check timeout",
     type=int,
     envvar=HEALTH_CHECK_TIMEOUT_ENV,
 )
 @click.option(
-    "--healthy-check-interval",
+    "--health-check-interval",
     required=False,
-    help="Healthy check interval",
+    help="Health check interval",
     type=int,
     envvar=HEALTH_CHECK_INTERVAL_ENV,
 )
