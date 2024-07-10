@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubespawner
+  namespace: moriarty
+data:
+  MORIARTY_KUBE_NAMESPACE_ENV: "moriarty"
+  # INIT_IMAGE:
+  # SIDECAR_IMAGE:
+  # IMAGE_PULL_SECRETS:

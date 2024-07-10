@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: moriarty-operator-init
+  namespace: moriarty
+spec:
+  template:
+    spec:
+      containers:
+        - name: moriarty-operator
+          image: wh1isper/moriarty
+          command: ["moriarty-operator"]
+          args: ["init"]
+          envFrom:
+            - secretRef:
+                name: database
+          imagePullPolicy: Always
+      restartPolicy: Never
+  backoffLimit: 0

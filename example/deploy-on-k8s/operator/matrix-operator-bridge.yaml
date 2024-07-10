@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moriarty-operator-bridge
+  namespace: moriarty
+  labels:
+    app: moriarty-operator-bridge
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: moriarty-operator-bridge
+  template:
+    metadata:
+      labels:
+        app: moriarty-operator-bridge
+    spec:
+      serviceAccountName: moriarty-operator
+      containers:
+        - name: moriarty-operator-bridge
+          image: wh1isper/moriarty
+          command: ["moriarty-operator"]
+          args: ["bridge"]
+          envFrom:
+            - secretRef:
+                name: sqs-bridge
+            - secretRef:
+                name: redis
+            - secretRef:
+                name: database
+            - secretRef:
+                name: model
+            - configMapRef:
+                name: kubespawner
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+      restartPolicy: Always
