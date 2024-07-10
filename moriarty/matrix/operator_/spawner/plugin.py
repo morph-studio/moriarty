@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 import pluggy
 
 from moriarty.envs import *
-from moriarty.tools import FlexibleModel
 
 if TYPE_CHECKING:
     from moriarty.matrix.operator_.orm import EndpointORM
+    from moriarty.matrix.operator_.params import EndpointRuntimeInfo
 
 
 project_name = "moriarty.matrix.spawner"
@@ -64,13 +64,6 @@ def register(manager):
 
     You can verify it by `moriarty-matrix list-plugins`.
     """
-
-
-class EndpointRuntimeInfo(FlexibleModel):
-    total_replicas_nums: int
-    updated_replicas_nums: int
-    avaliable_replicas_nums: int
-    unavailable_replicas_nums: int
 
 
 class EnvironmentBuilder:
@@ -150,7 +143,7 @@ class Spawner:
     async def delete(self, endpoint_name: str) -> None:
         raise NotImplementedError
 
-    async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
+    async def get_runtime_info(self, endpoint_name: str) -> "EndpointRuntimeInfo":
         raise NotImplementedError
 
     async def scale(self, endpoint_name: str, target_replicas: int) -> None:

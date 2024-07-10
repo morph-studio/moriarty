@@ -2,8 +2,14 @@ from datetime import datetime
 from typing import Optional
 
 from moriarty.matrix.operator_.enums_ import MetricType
-from moriarty.matrix.operator_.spawner.plugin import EndpointRuntimeInfo
 from moriarty.tools import FlexibleModel
+
+
+class EndpointRuntimeInfo(FlexibleModel):
+    total_replicas_nums: int
+    updated_replicas_nums: int
+    avaliable_replicas_nums: int
+    unavailable_replicas_nums: int
 
 
 class ResourceScope(FlexibleModel):

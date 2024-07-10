@@ -11,6 +11,7 @@ from .sdk import (
     request_scan_autoscale_log,
     request_scan_endpoint,
     request_set_autoscale,
+    request_update_endpoint,
 )
 
 
@@ -132,6 +133,12 @@ def query(
 
 @click.command()
 @click.option(
+    "--endpoint-name",
+    help="Endpoint name",
+    type=str,
+    required=True,
+)
+@click.option(
     "--api-url",
     help="Moriarty Operator API URL",
     type=str,
@@ -146,12 +153,42 @@ def query(
 )
 def deploy(
     api_url,
+    endpoint_name,
+    image,
+    model_path,
+    queue_capacity,
+    replicas,
+    # ResourceScope
+    cpu_request,
+    cpu_limit,
+    memory_request,
+    memory_limit,
+    gpu_nums,
+    gpu_type,
+    # ScheduleScope
+    node_labels,
+    node_affinity,
+    pod_labels,
+    # ContainerScope
+    environment_variables,
+    environment_variables_secret_refs,
+    commands,
+    args,
+    invoke_port,
+    invoke_path,
+    health_check_path,
+    # SidecarScope
+    concurrency,
+    process_timeout,
+    health_check_timeout,
+    health_check_interval,
     token,
 ):
     pass
 
 
 @click.command()
+@click.argument("endpoint_name")
 @click.option(
     "--api-url",
     help="Moriarty Operator API URL",
@@ -167,9 +204,41 @@ def deploy(
 )
 def update(
     api_url,
+    endpoint_name,
+    image,
+    model_path,
+    queue_capacity,
+    replicas,
+    # ResourceScope
+    cpu_request,
+    cpu_limit,
+    memory_request,
+    memory_limit,
+    gpu_nums,
+    gpu_type,
+    # ScheduleScope
+    node_labels,
+    node_affinity,
+    pod_labels,
+    # ContainerScope
+    environment_variables,
+    environment_variables_secret_refs,
+    commands,
+    args,
+    invoke_port,
+    invoke_path,
+    health_check_path,
+    # SidecarScope
+    concurrency,
+    process_timeout,
+    health_check_timeout,
+    health_check_interval,
     token,
 ):
-    pass
+    response = request_update_endpoint()
+
+    print(f"E")
+    print(request_update_endpoint)
 
 
 @click.command()

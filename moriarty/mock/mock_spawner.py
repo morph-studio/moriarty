@@ -1,10 +1,7 @@
 from moriarty.log import logger
 from moriarty.matrix.operator_.orm import EndpointORM
-from moriarty.matrix.operator_.spawner.plugin import (
-    EndpointRuntimeInfo,
-    Spawner,
-    hookimpl,
-)
+from moriarty.matrix.operator_.params import EndpointRuntimeInfo
+from moriarty.matrix.operator_.spawner.plugin import Spawner, hookimpl
 
 
 class MockSpawner(Spawner):
