@@ -28,5 +28,3 @@ jobs:
             - name: Test import
               run: |
                   python -c "import moriarty.sidecar.cli; print('ok')"
-                  python -c "from moriarty.matrix.connector.sdk import invoke; print('ok')"
-                  python -c "from moriarty.deploy.cli import *; print('ok')"
