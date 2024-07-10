@@ -27,10 +27,10 @@ class MockSpawner(Spawner):
 
     async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
         return EndpointRuntimeInfo(
-            total_node_nums=1,
-            updated_node_nums=1,
-            avaliable_node_nums=1,
-            unavailable_node_nums=0,
+            total_replicas_nums=1,
+            updated_replicas_nums=1,
+            avaliable_replicas_nums=1,
+            unavailable_replicas_nums=0,
         )
 
     async def scale(self, endpoint_name: str, target_replicas: int) -> None:
