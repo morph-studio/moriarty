@@ -83,7 +83,14 @@ class DeploymentMixin(EnvironmentBuilder):
         deployment_name = self.get_deployment_name(endpoint_name)
         async with ApiClient() as api:
             v1 = client.AppsV1Api(api)
-            await v1.delete_namespaced_deployment(name=deployment_name, namespace=self.namespace)
+            try:
+                await v1.delete_namespaced_deployment(
+                    name=deployment_name, namespace=self.namespace
+                )
+            except client.rest.ApiException as e:
+                if e.status == 404:
+                    return
+                raise
 
     async def restart_deployment(self, endpoint_name: str) -> None:
         now = datetime.datetime.now()

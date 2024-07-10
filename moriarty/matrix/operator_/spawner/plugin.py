@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pluggy
 
 from moriarty.envs import *
-from moriarty.matrix.operator_.orm import EndpointORM
 from moriarty.tools import FlexibleModel
+
+if TYPE_CHECKING:
+    from moriarty.matrix.operator_.orm import EndpointORM
+
 
 project_name = "moriarty.matrix.spawner"
 """
@@ -76,7 +81,7 @@ class EnvironmentBuilder:
     model_s3_endpoint_url = os.getenv(MODEL_S3_ENDPOINT_URL_ENV) or os.getenv("AWS_S3_ENDPOINT_URL")
     model_aws_region_name = os.getenv(MODEL_AWS_REGION_ENV) or os.getenv("AWS_REGION_NAME")
 
-    def build_sidecar_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
+    def build_sidecar_environment(self, endpoint_orm: "EndpointORM") -> dict[str, str]:
         return {
             **{
                 k: str(v)
@@ -106,7 +111,7 @@ class EnvironmentBuilder:
             },
         }
 
-    def build_compute_environment(self, endpoint_orm: EndpointORM) -> dict[str, str]:
+    def build_compute_environment(self, endpoint_orm: "EndpointORM") -> dict[str, str]:
         return {
             **{str(k): str(v) for k, v in endpoint_orm.environment_variables.items()},
         }
@@ -136,10 +141,10 @@ class Spawner:
     async def count_avaliable_instances(self, endpoint_name: str) -> int:
         raise NotImplementedError
 
-    async def create(self, endpoint_orm: EndpointORM) -> None:
+    async def create(self, endpoint_orm: "EndpointORM") -> None:
         raise NotImplementedError
 
-    async def update(self, endpoint_orm: EndpointORM, need_restart: bool = True) -> None:
+    async def update(self, endpoint_orm: "EndpointORM", need_restart: bool = True) -> None:
         raise NotImplementedError
 
     async def delete(self, endpoint_name: str) -> None:
