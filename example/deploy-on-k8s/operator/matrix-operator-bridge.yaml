@@ -17,6 +17,7 @@ spec:
       labels:
         app: moriarty-operator-bridge
     spec:
+      serviceAccountName: moriarty-operator
       containers:
         - name: moriarty-operator-bridge
           image: wh1isper/moriarty
