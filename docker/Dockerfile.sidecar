@@ -13,5 +13,5 @@ RUN pip install --no-cache-dir $(echo /tmp/*.whl)
 
 ENV MORIARTY_LOG_LEVEL=INFO
 
-CMD [ "moriarty-sidecar" ]
-ENTRYPOINT [ "strat" ]
+ENTRYPOINT [ "moriarty-sidecar" ]
+CMD [ "start" ]
