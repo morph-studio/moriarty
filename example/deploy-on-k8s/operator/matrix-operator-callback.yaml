@@ -1,39 +1,40 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: moriarty-operator-callback
+  name: moriarty-operator
   namespace: moriarty
 spec:
   selector:
-    app: moriarty-operator-callback
+    app: moriarty-operator
   ports:
-    - name: moriarty-operator-callback
-      port: 8902
+    - name: moriarty-operator
+      port: 8999
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: moriarty-operator-api
+  name: moriarty-operator-callback
   namespace: moriarty
   labels:
-    app: moriarty-operator-api
+    app: moriarty-operator-callback
 spec:
-  replicas: 3
+  replicas: 1
   strategy:
     type: RollingUpdate
   selector:
     matchLabels:
-      app: moriarty-operator-api
+      app: moriarty-operator-callback
   template:
     metadata:
       labels:
-        app: moriarty-operator-api
+        app: moriarty-operator-callback
     spec:
+      serviceAccountName: moriarty-operator
       containers:
-        - name: moriarty-operator-api
+        - name: moriarty-operator-callback
           image: wh1isper/moriarty
           command: ["moriarty-operator"]
-          args: ["api"]
+          args: ["callback"]
           envFrom:
             - secretRef:
                 name: sqs-bridge
@@ -46,7 +47,7 @@ spec:
             - configMapRef:
                 name: kubespawner
           ports:
-            - containerPort: 8902
+            - containerPort: 8999
           imagePullPolicy: Always
           resources:
             requests:
@@ -58,7 +59,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /
-              port: 8902
+              port: 8999
             initialDelaySeconds: 3
             periodSeconds: 10
             timeoutSeconds: 2
