@@ -43,6 +43,7 @@ class DeploymentMixin(EnvironmentBuilder):
         self, endpoint_name: str
     ) -> client.V1DeploymentStatus | None:
         deployment_name = self.get_deployment_name(endpoint_name)
+        logger.debug(f"Inspect deployment status: {deployment_name}(as endpoint {endpoint_name}).")
 
         async with ApiClient() as api:
             v1 = client.AppsV1Api(api)
@@ -142,7 +143,7 @@ class DeploymentMixin(EnvironmentBuilder):
             "moriarty.version": __version__,
             "moriarty.kubespawner.version": __version__,
             "moriarty.kubespawner.gpu_nums": str(endpoint_orm.gpu_nums or 0),
-            "moriarty.kubespawner.gpu_type": str(endpoint_orm.gpu_type or "").replace("/", "."),
+            "moriarty.kubespawner.gpu_type": str(endpoint_orm.gpu_type or "").replace("/", "-"),
         }
 
         deployment.spec = client.V1DeploymentSpec(
@@ -163,28 +164,7 @@ class DeploymentMixin(EnvironmentBuilder):
                 ),
                 spec=client.V1PodSpec(
                     restart_policy="Always",
-                    affinity=(
-                        client.V1Affinity(
-                            node_affinity=client.V1NodeAffinity(
-                                required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
-                                    node_selector_terms=[
-                                        client.V1NodeSelectorTerm(
-                                            match_expressions=[
-                                                {
-                                                    "key": k,
-                                                    "operator": "In",
-                                                    "values": v,
-                                                }
-                                                for k, v in endpoint_orm.node_affinity.items()
-                                            ]
-                                        )
-                                    ]
-                                )
-                            )
-                        )
-                        if endpoint_orm.node_affinity
-                        else None
-                    ),
+                    affinity=self._make_affinity(endpoint_orm),
                     node_selector=(
                         client.V1NodeSelector(
                             match_labels={k: v for k, v in endpoint_orm.node_labels.items() if v}
@@ -217,6 +197,28 @@ class DeploymentMixin(EnvironmentBuilder):
         )
 
         return deployment
+
+    def _make_affinity(self, endpoint_orm: EndpointORM) -> client.V1Affinity | None:
+        if not endpoint_orm.node_affinity:
+            return None
+        return client.V1Affinity(
+            node_affinity=client.V1NodeAffinity(
+                required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
+                    node_selector_terms=[
+                        client.V1NodeSelectorTerm(
+                            match_expressions=[
+                                {
+                                    "key": k,
+                                    "operator": "In",
+                                    "values": v,
+                                }
+                                for k, v in endpoint_orm.node_affinity.items()
+                            ]
+                        )
+                    ]
+                )
+            )
+        )
 
     def _make_init_container(
         self,
@@ -394,26 +396,31 @@ class KubeSpawner(Spawner, DeploymentMixin):
         return status.ready_replicas or 0
 
     async def create(self, endpoint_orm: EndpointORM) -> None:
+        logger.info(f"Create deployment: {endpoint_orm.endpoint_name}.")
         await self.make_and_apply_deployment(endpoint_orm)
 
     async def update(self, endpoint_orm: EndpointORM, need_restart: bool = True) -> None:
+        logger.info(f"Update deployment: {endpoint_orm.endpoint_name}.")
         await self.make_and_update_deployment(endpoint_orm)
         if need_restart:
+            logger.info(f"Restart deployment: {endpoint_orm.endpoint_name}.")
             await self.restart_deployment(endpoint_orm.endpoint_name)
 
     async def delete(self, endpoint_name: str) -> None:
+        logger.info(f"Delete deployment: {endpoint_name}.")
         await self.delete_deployment(endpoint_name)
 
     async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
         status = await self.inspect_deployment_status(endpoint_name)
         return EndpointRuntimeInfo(
-            total_node_nums=status.replicas or 0,
-            updated_node_nums=status.updated_replicas or 0,
-            avaliable_node_nums=status.ready_replicas or 0,
-            unavailable_node_nums=status.unavailable_replicas or 0,
+            total_replicas_nums=status.replicas or 0,
+            updated_replicas_nums=status.updated_replicas or 0,
+            avaliable_replicas_nums=status.ready_replicas or 0,
+            unavailable_replicas_nums=status.unavailable_replicas or 0,
         )
 
     async def scale(self, endpoint_name: str, target_replicas: int) -> None:
+        logger.info(f"Scale deployment: {endpoint_name}.")
         await self.scale_deployment(endpoint_name, target_replicas)
 
 

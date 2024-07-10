@@ -67,4 +67,4 @@ jobs:
                   cache-to: type=gha,mode=max
                   file: ./docker/Dockerfile.sidecar
                   push: true
-                  tags: wh1isper/moriarty:latest
+                  tags: wh1isper/moriarty-sidecar:latest

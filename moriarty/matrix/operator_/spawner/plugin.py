@@ -62,10 +62,10 @@ def register(manager):
 
 
 class EndpointRuntimeInfo(FlexibleModel):
-    total_node_nums: int
-    updated_node_nums: int
-    avaliable_node_nums: int
-    unavailable_node_nums: int
+    total_replicas_nums: int
+    updated_replicas_nums: int
+    avaliable_replicas_nums: int
+    unavailable_replicas_nums: int
 
 
 class EnvironmentBuilder:
