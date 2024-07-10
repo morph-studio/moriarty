@@ -86,7 +86,7 @@ from moriarty.tools import coro
     envvar=INVOKE_PATH_ENV,
 )
 @click.option(
-    "--health-check-url",
+    "--health-check-path",
     required=False,
     help="Health check url",
     type=str,

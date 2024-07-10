@@ -239,6 +239,10 @@ class AutoscalerManager(EndpointMixin, CooldownMixin):
     async def set_autoscale(
         self, endpoint_name: str, params: SetAutoscaleParams
     ) -> QueryEndpointAutoscaleResponse:
+        endpoint_orm = await self.get_endpoint_orm(endpoint_name)
+        if endpoint_orm is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Endpoint not found")
+
         params = {
             k: v
             for k, v in dict(
