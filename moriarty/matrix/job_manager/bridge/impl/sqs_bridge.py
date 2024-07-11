@@ -131,7 +131,7 @@ class SQSBridge(QueueBridge):
         )
         response_body = (
             {
-                "content": base64.b64encode(json.dumps(result.payload).encode()).decode(),
+                "content": base64.b64encode(result.payload.encode()).decode(),
                 "message": result.message,
                 "encoding": "BASE64",
             }
@@ -277,9 +277,7 @@ class SQSBridge(QueueBridge):
                     inference_id=message["inferenceId"],
                     status=InferenceResultStatus.COMPLETED,
                     message=message["responseBody"]["message"],
-                    payload=json.loads(
-                        base64.b64decode(message["responseBody"]["content"]).decode("utf-8")
-                    ),
+                    payload=base64.b64decode(message["responseBody"]["content"]).decode("utf-8"),
                 )
                 valid_messages.append(
                     (
