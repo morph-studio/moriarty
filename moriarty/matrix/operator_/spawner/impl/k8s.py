@@ -158,15 +158,14 @@ class DeploymentMixin(EnvironmentBuilder):
             selector=client.V1LabelSelector(
                 match_labels={
                     "app": "moriarty",
-                    "moriarty.endpoint": endpoint_orm.endpoint_name,
+                    "moriarty.endpoint.deployment": deployment_name,
                 }
             ),
             template=client.V1PodTemplateSpec(
                 metadata=client.V1ObjectMeta(
                     labels={
                         "app": "moriarty",
-                        "moriarty.endpoint": endpoint_orm.endpoint_name,
-                        **{str(k): str(v) for k, v in endpoint_orm.pod_labels.items()},
+                        "moriarty.endpoint.deployment": deployment_name,
                     },
                 ),
                 spec=client.V1PodSpec(

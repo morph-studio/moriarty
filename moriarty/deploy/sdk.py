@@ -261,7 +261,6 @@ def request_create_endpoint(
     # ScheduleScope
     node_labels: dict[str, str] = None,
     node_selector: dict[str, str] = None,
-    pod_labels: dict[str, str] = None,
     # ContainerScope
     environment_variables: dict[str, str] = None,
     environment_variables_secret_refs: list[str] = None,
@@ -312,7 +311,6 @@ def request_create_endpoint(
                     for k, v in dict(
                         node_labels=node_labels,
                         node_selector=node_selector,
-                        pod_labels=pod_labels,
                     ).items()
                     if v is not None
                 }
@@ -374,7 +372,6 @@ def request_update_endpoint(
     # ScheduleScope
     node_labels: dict[str, str] = None,
     node_selector: dict[str, str] = None,
-    pod_labels: dict[str, str] = None,
     # ContainerScope
     environment_variables: dict[str, str] = None,
     environment_variables_secret_refs: list[str] = None,
@@ -426,7 +423,6 @@ def request_update_endpoint(
                     for k, v in dict(
                         node_labels=node_labels,
                         node_selector=node_selector,
-                        pod_labels=pod_labels,
                     ).items()
                     if v is not None
                 }

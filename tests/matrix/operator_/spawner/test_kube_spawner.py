@@ -26,7 +26,6 @@ def mock_endpoint_orm(session):
     endpoint_name = "mock_endpoint"
     orm = EndpointORM(
         endpoint_name=endpoint_name,
-        pod_labels={"a": "b"},
     )
     session.add(orm)
     session.commit()
