@@ -99,9 +99,13 @@ class InferencerConsumer:
         )
 
     async def _callback(self, callback_params: MatrixCallback) -> None:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=60) as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             try:
-                await client.post(self.callback_url, data=callback_params.model_dump_json())
+                await client.post(
+                    self.callback_url,
+                    data=callback_params.model_dump_json(),
+                    timeout=60,
+                )
             except httpx.ConnectError as e:
                 logger.error(f"Callback failed: {e}")
 
