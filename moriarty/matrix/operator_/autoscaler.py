@@ -307,7 +307,11 @@ class AutoscalerManager(EndpointMixin, CooldownMixin):
 
         query = query.limit(limit)
         total = (
-            await self.session.execute(select(func.count(AutoscaleLogORM.endpoint_name)))
+            await self.session.execute(
+                select(func.count(AutoscaleLogORM)).where(
+                    AutoscaleLogORM.endpoint_name == endpoint_name
+                )
+            )
         ).scalar_one()
         log_orms = (await self.session.execute(query)).scalars().all()
         next_cursor = log_orms[-1].id_ if log_orms else None

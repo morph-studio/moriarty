@@ -1,5 +1,6 @@
 import click
 
+from moriarty.deploy.config import ConfigLoader
 from moriarty.deploy.endpoint import Endpoint
 from moriarty.envs import MORIARTY_MATRIX_API_URL_ENV, MORIARTY_MATRIX_TOKEN_ENV
 from moriarty.matrix.operator_.enums_ import MetricType
@@ -50,28 +51,22 @@ from .sdk import (
     help="Order",
     type=str,
 )
-@click.option(
-    "--api-url",
-    help="Moriarty Operator API URL",
-    type=str,
-    envvar=MORIARTY_MATRIX_API_URL_ENV,
-    required=True,
-)
-@click.option(
-    "--token",
-    help="Moriarty Operator API token",
-    type=str,
-    envvar=MORIARTY_MATRIX_TOKEN_ENV,
-)
 def scan(
-    api_url,
-    token,
     limit,
     cursor,
     keyword,
     order_by,
     order,
 ):
+    config = ConfigLoader()
+    api_url = config.get_api_url()
+    if not api_url:
+        print(
+            f"Please config {MORIARTY_MATRIX_API_URL_ENV} and {MORIARTY_MATRIX_TOKEN_ENV} for API URL and token, or edit {config.config_path}"
+        )
+
+    token = config.get_api_token()
+
     cursor = cursor
     while True:
         response = request_scan_endpoint(
@@ -95,7 +90,7 @@ def scan(
             )
             print(f"Endpoint: {endpoint} | Autoscale: {autoscale}")
 
-        if not response.endpoints:
+        if not response.endpoints or len(response.endpoints) < limit:
             print("\nNo more results...")
             return
         input("Press Enter to continue...")
@@ -423,7 +418,7 @@ def query_autoscale_log(
         for log in response.logs:
             print(log)
 
-        if not response.logs:
+        if not response.logs or len(response.logs) < limit:
             print("\nNo more results...")
             return
         input("Press Enter to continue...")
