@@ -30,5 +30,11 @@
         "process_timeout": 3600,
         "health_check_timeout": 1200,
         "health_check_interval": 5
-    }
+    },
+    "min_replicas": null,
+    "max_replicas": null,
+    "scale_in_cooldown": null,
+    "scale_out_cooldown": null,
+    "metrics": null,
+    "metrics_threshold": null
 }

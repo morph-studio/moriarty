@@ -1,5 +1,7 @@
 import click
 
+from moriarty.deploy.config import ConfigLoader
+from moriarty.deploy.endpoint import Endpoint
 from moriarty.envs import MORIARTY_MATRIX_API_URL_ENV, MORIARTY_MATRIX_TOKEN_ENV
 from moriarty.matrix.operator_.enums_ import MetricType
 from moriarty.matrix.operator_.params import CreateEndpointParams, UpdateEndpointParams
@@ -8,6 +10,7 @@ from .sdk import (
     request_create_endpoint_with_params,
     request_delete_autoscale,
     request_delete_endpoint,
+    request_exist_endpoint,
     request_query_autoscale,
     request_query_endpoint,
     request_scan_autoscale_log,
@@ -48,28 +51,22 @@ from .sdk import (
     help="Order",
     type=str,
 )
-@click.option(
-    "--api-url",
-    help="Moriarty Operator API URL",
-    type=str,
-    envvar=MORIARTY_MATRIX_API_URL_ENV,
-    required=True,
-)
-@click.option(
-    "--token",
-    help="Moriarty Operator API token",
-    type=str,
-    envvar=MORIARTY_MATRIX_TOKEN_ENV,
-)
 def scan(
-    api_url,
-    token,
     limit,
     cursor,
     keyword,
     order_by,
     order,
 ):
+    config = ConfigLoader()
+    api_url = config.get_api_url()
+    if not api_url:
+        print(
+            f"Please config {MORIARTY_MATRIX_API_URL_ENV} and {MORIARTY_MATRIX_TOKEN_ENV} for API URL and token, or edit {config.config_path}"
+        )
+
+    token = config.get_api_token()
+
     cursor = cursor
     while True:
         response = request_scan_endpoint(
@@ -93,7 +90,7 @@ def scan(
             )
             print(f"Endpoint: {endpoint} | Autoscale: {autoscale}")
 
-        if not response.endpoints:
+        if not response.endpoints or len(response.endpoints) < limit:
             print("\nNo more results...")
             return
         input("Press Enter to continue...")
@@ -153,65 +150,61 @@ def query(
     type=str,
     envvar=MORIARTY_MATRIX_TOKEN_ENV,
 )
-def deploy(
+@click.option(
+    "--restart",
+    default=True,
+    help="Restart endpoint",
+    type=bool,
+    is_flag=True,
+    required=False,
+)
+def deploy_or_update(
     api_url,
     endpoint_config_file,
     token,
+    restart,
 ):
     with open(endpoint_config_file) as f:
-        params: CreateEndpointParams = CreateEndpointParams.model_validate_json(
+        endpoint: Endpoint = Endpoint.model_validate_json(
             f.read(),
         )
 
-    request_create_endpoint_with_params(api_url=api_url, params=params, token=token)
-    print(f"Created endpoint: {params.endpoint_name}")
-
-
-@click.command()
-@click.argument("endpoint_name")
-@click.option(
-    "--endpoint-config-file",
-    help="Endpoint config file",
-    type=str,
-    required=True,
-)
-@click.option(
-    "--api-url",
-    help="Moriarty Operator API URL",
-    type=str,
-    envvar=MORIARTY_MATRIX_API_URL_ENV,
-    required=True,
-)
-@click.option(
-    "--token",
-    help="Moriarty Operator API token",
-    type=str,
-    envvar=MORIARTY_MATRIX_TOKEN_ENV,
-)
-def update(
-    api_url,
-    endpoint_name,
-    endpoint_config_file,
-    token,
-):
-    with open(endpoint_config_file) as f:
-        params: UpdateEndpointParams = UpdateEndpointParams.model_validate_json(
-            f.read(),
-        )
-
-    autoscale = request_query_autoscale(endpoint_name=endpoint_name, api_url=api_url, token=token)
-    if autoscale:
-        print(f"`{endpoint_name}` has autoscale: {autoscale}, set replicas to None")
-        params.replicas = None
-
-    response = request_update_endpoint_with_params(
-        api_url=api_url,
+    endpoint_name = endpoint.endpoint_name
+    if request_exist_endpoint(
         endpoint_name=endpoint_name,
-        params=params,
+        api_url=api_url,
         token=token,
-    )
-    print(f"Updated endpoint: `{endpoint_name}`")
-    print(response)
+    ):
+        update_params = UpdateEndpointParams.model_validate(endpoint)
+        update_params.need_restart = restart
+        request_update_endpoint_with_params(
+            endpoint_name=endpoint_name,
+            api_url=api_url,
+            params=update_params,
+            token=token,
+        )
+        print(f"Updated endpoint: {endpoint_name}")
+    else:
+        request_create_endpoint_with_params(
+            api_url=api_url,
+            params=CreateEndpointParams.model_validate(endpoint),
+            token=token,
+        )
+        print(f"Created endpoint: {endpoint_name}")
+
+    if endpoint.config_autoscale:
+        request_set_autoscale(
+            endpoint_name=endpoint_name,
+            min_replicas=endpoint.min_replicas,
+            max_replicas=endpoint.max_replicas,
+            scale_in_cooldown=endpoint.scale_in_cooldown,
+            scale_out_cooldown=endpoint.scale_out_cooldown,
+            metrics=endpoint.metrics,
+            metrics_threshold=endpoint.metrics_threshold,
+            api_url=api_url,
+            token=token,
+        )
+        print(f"Set autoscale for endpoint: {endpoint_name}")
 
 
 @click.command()
@@ -425,7 +418,7 @@ def query_autoscale_log(
         for log in response.logs:
             print(log)
 
-        if not response.logs:
+        if not response.logs or len(response.logs) < limit:
             print("\nNo more results...")
             return
         input("Press Enter to continue...")
@@ -438,8 +431,7 @@ def cli():
 
 cli.add_command(scan)
 cli.add_command(query)
-cli.add_command(deploy)
-cli.add_command(update)
+cli.add_command(deploy_or_update)
 cli.add_command(delete)
 cli.add_command(autoscale)
 cli.add_command(delete_autoscale)

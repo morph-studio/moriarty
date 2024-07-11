@@ -90,6 +90,24 @@ def request_scan_autoscale_log(
     return QueryEndpointAutoscaleLogResponse.model_validate(response.json())
 
 
+def request_exist_endpoint(
+    endpoint_name: str,
+    api_url: str,
+    token: str = None,
+) -> bool:
+    try:
+        request_query_endpoint(
+            endpoint_name=endpoint_name,
+            api_url=api_url,
+            token=token,
+        )
+        return True
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            return False
+        raise
+
+
 def request_query_endpoint(
     endpoint_name: str,
     api_url: str,
@@ -103,7 +121,7 @@ def request_query_endpoint(
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
     return QueryEndpointResponse.model_validate(response.json())
 
@@ -124,7 +142,7 @@ def request_delete_endpoint(
         if response.status_code == 404:
             return None
 
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
 
     return None
@@ -146,7 +164,7 @@ def request_delete_autoscale(
         if response.status_code == 404:
             return None
 
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
 
     return None
@@ -168,7 +186,7 @@ def request_query_autoscale(
         if e.response.status_code == 404:
             return None
 
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
     return QueryEndpointAutoscaleResponse.model_validate(response.json())
 
@@ -200,7 +218,7 @@ def request_set_autoscale(
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
     return QueryEndpointAutoscaleResponse.model_validate(response.json())
 
@@ -219,7 +237,7 @@ def request_create_endpoint_with_params(
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
     return None
 
@@ -239,7 +257,7 @@ def request_update_endpoint_with_params(
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
     return QueryEndpointResponse.model_validate(response.json())
 
@@ -348,7 +366,7 @@ def request_create_endpoint(
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
 
     return
@@ -460,7 +478,7 @@ def request_update_endpoint(
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
-        logger.error(f"Request error, response: {response.text}")
+        logger.info(f"Response status {response.status_code}, response: {response.text}")
         raise
 
     return QueryEndpointResponse.model_validate(response.json())
