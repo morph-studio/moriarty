@@ -238,26 +238,19 @@ class DeploymentMixin(EnvironmentBuilder):
         ]
 
         if endpoint_orm.model_path:
-            if endpoint_orm.model_path.endswith("/"):
-                command.extend(
-                    [
-                        "&&",
-                        "/s5cmd",
-                        "cp",
-                        f"{endpoint_orm.model_path}/*",
-                        "/opt/ml/model/",
-                    ]
-                )
-            else:
-                command.extend(
-                    [
-                        "&&",
-                        "/s5cmd",
-                        "cp",
-                        endpoint_orm.model_path,
-                        "/opt/ml/model/",
-                    ]
-                )
+            command.extend(
+                [
+                    "&&",
+                    "/s5cmd",
+                    "cp",
+                    (
+                        f"{endpoint_orm.model_path}*"
+                        if endpoint_orm.model_path.endswith("/")
+                        else endpoint_orm.model_path
+                    ),
+                    "/opt/ml/model/",
+                ]
+            )
 
         # Make sure the model dir is read-only
         command.extend(
