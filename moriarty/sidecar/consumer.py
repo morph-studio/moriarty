@@ -31,7 +31,7 @@ class InferencerConsumer:
         invoke_port: int = "8080",
         invoke_path: str = "/invocations",
         health_check_path: str = "/ping",
-        callbacl_url: str = "http://moriarty-operator-callback:8999/api/callback",
+        callbacl_url: str = "http://moriarty-operator-callback:8999/callback",
         enable_retry: bool = False,
         enable_ssl: bool = False,
         concurrency: int = 1,
