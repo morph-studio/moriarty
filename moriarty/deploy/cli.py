@@ -254,13 +254,13 @@ def delete(
 )
 @click.option(
     "--scale-in-cooldown",
-    required=True,
+    required=False,
     help="Scale in cooldown",
     type=int,
 )
 @click.option(
     "--scale-out-cooldown",
-    required=True,
+    required=False,
     help="Scale out cooldown",
     type=int,
 )
@@ -301,7 +301,7 @@ def autoscale(
     api_url,
     token,
 ):
-    request_set_autoscale(
+    autoscale = request_set_autoscale(
         endpoint_name=endpoint_name,
         min_replicas=min_replicas,
         max_replicas=max_replicas,
@@ -312,13 +312,7 @@ def autoscale(
         api_url=api_url,
         token=token,
     )
-
-    autoscale = request_query_autoscale(endpoint_name=endpoint_name, api_url=api_url, token=token)
-    if autoscale:
-        print("Autoscale set successfully")
-        print(autoscale)
-    else:
-        print(f"No autoscale found for `{endpoint_name}`")
+    print(autoscale)
 
 
 @click.command()
