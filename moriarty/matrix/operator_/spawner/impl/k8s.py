@@ -107,7 +107,7 @@ class DeploymentMixin(EnvironmentBuilder):
 
         async with ApiClient() as api:
             v1_apps = client.AppsV1Api(api)
-            v1_apps.patch_namespaced_deployment(deployment, namespace, body, pretty="true")
+            await v1_apps.patch_namespaced_deployment(deployment, namespace, body, pretty="true")
 
     async def scale_deployment(self, endpoint_name: str, target_replicas: int) -> None:
         deployment = self.get_deployment_name(endpoint_name)
