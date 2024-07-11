@@ -131,7 +131,7 @@ class SQSBridge(QueueBridge):
         )
         response_body = (
             {
-                "content": base64.b64encode(json.dumps(result.payload).encode()).decode(),
+                "content": base64.b64encode(result.payload.encode()).decode(),
                 "message": result.message,
                 "encoding": "BASE64",
             }
