@@ -111,6 +111,8 @@ class Bridger(EndpointMixin, AutoscaleMixin):
             return False
 
         pending_count = await self.job_producer.count_unprocessed_jobs(endpoint_name)
+        logger.debug(f"Pending count for {endpoint_name}: {pending_count}")
+
         autoscaler_orm = await self.get_autoscaler_orm(endpoint_name)
         if not autoscaler_orm:
             # No autoscaler, use default behavior
