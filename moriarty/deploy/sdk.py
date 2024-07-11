@@ -178,8 +178,8 @@ def request_set_autoscale(
     api_url: str,
     min_replicas: int,
     max_replicas: int,
-    scale_in_cooldown: int,
-    scale_out_cooldown: int,
+    scale_in_cooldown: int | None,
+    scale_out_cooldown: int | None,
     metrics: MetricType,
     metrics_threshold: float,
     token: str = None,
@@ -202,7 +202,7 @@ def request_set_autoscale(
     except httpx.HTTPStatusError:
         logger.error(f"Request error, response: {response.text}")
         raise
-    return QueryEndpointResponse.model_validate(response.json())
+    return QueryEndpointAutoscaleResponse.model_validate(response.json())
 
 
 def request_create_endpoint_with_params(
