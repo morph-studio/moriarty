@@ -24,7 +24,6 @@ class ResourceScope(FlexibleModel):
 class ScheduleScope(FlexibleModel):
     node_labels: Optional[dict] = None
     node_affinity: Optional[dict] = None
-    pod_labels: Optional[dict] = None
 
 
 class ContainerScope(FlexibleModel):

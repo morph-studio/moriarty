@@ -213,7 +213,6 @@ class Operator:
             schedule=ScheduleScope(
                 node_labels=endpoint_orm.node_labels,
                 node_affinity=endpoint_orm.node_affinity,
-                pod_labels=endpoint_orm.pod_labels,
             ),
             container=ContainerScope(
                 environment_variables=endpoint_orm.environment_variables,
@@ -312,7 +311,6 @@ class Operator:
                 for k, v in dict(
                     node_labels=params.schedule.node_labels,
                     node_affinity=params.schedule.node_affinity,
-                    pod_labels=params.schedule.pod_labels,
                 ).items()
                 if v is not None
             },
@@ -400,7 +398,6 @@ class Operator:
                         for k, v in dict(
                             node_labels=params.schedule.node_labels,
                             node_affinity=params.schedule.node_affinity,
-                            pod_labels=params.schedule.pod_labels,
                         ).items()
                         if v is not None
                     }

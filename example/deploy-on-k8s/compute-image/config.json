@@ -14,8 +14,7 @@
     },
     "schedule": {
         "node_labels": null,
-        "node_affinity": null,
-        "pod_labels": null
+        "node_affinity": null
     },
     "container": {
         "environment_variables": null,

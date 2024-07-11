@@ -76,7 +76,6 @@ class EndpointORM(Base):
     # Schedule
     node_labels = Column(JSON, nullable=False, default={})
     node_affinity = Column(JSON, nullable=False, default={})
-    pod_labels = Column(JSON, nullable=False, default={})
 
     # Config for sidecar
     concurrency = Column(Integer, nullable=False, default=1)
