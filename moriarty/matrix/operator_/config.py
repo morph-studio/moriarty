@@ -22,7 +22,7 @@ def get_config() -> Config:
         DB_DATABASE_ENV: "moriarty-matrix",
         REDIS_HOST_ENV: "localhost",
         REDIS_PORT_ENV: 6379,
-        REDIS_DB_ENV: 6,
+        REDIS_DB_ENV: 0,
         REDIS_TLS_ENV: False,
     }
 
