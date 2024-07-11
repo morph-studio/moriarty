@@ -87,7 +87,7 @@ class UpdateEndpointParams(FlexibleModel):
     container: Optional[ContainerScope] = None
     sidecar: Optional[SidecarScope] = None
 
-    need_restart: bool = False
+    need_restart: bool = True
 
 
 class QueryEndpointAutoscaleResponse(FlexibleModel):
