@@ -130,7 +130,7 @@ def query(
     if autoscale:
         print(autoscale)
     else:
-        print(f"No autoscale found for {endpoint_name}")
+        print(f"No autoscale found for `{endpoint_name}`")
 
 
 @click.command()
@@ -201,7 +201,7 @@ def update(
 
     autoscale = request_query_autoscale(endpoint_name=endpoint_name, api_url=api_url, token=token)
     if autoscale:
-        print(f"{endpoint_name} has autoscale: {autoscale}, set replicas to None")
+        print(f"`{endpoint_name}` has autoscale: {autoscale}, set replicas to None")
         params.replicas = None
 
     response = request_update_endpoint_with_params(
@@ -210,7 +210,7 @@ def update(
         params=params,
         token=token,
     )
-    print(f"Updated endpoint: {endpoint_name}")
+    print(f"Updated endpoint: `{endpoint_name}`")
     print(response)
 
 
@@ -235,7 +235,7 @@ def delete(
     token,
 ):
     request_delete_endpoint(endpoint_name=endpoint_name, api_url=api_url, token=token)
-    print(f"Endpoint {endpoint_name} deleted")
+    print(f"Endpoint `{endpoint_name}` deleted")
 
 
 @click.command()
@@ -318,7 +318,7 @@ def autoscale(
         print("Autoscale set successfully")
         print(autoscale)
     else:
-        print(f"No autoscale found for {endpoint_name}")
+        print(f"No autoscale found for `{endpoint_name}`")
 
 
 @click.command()
@@ -348,7 +348,7 @@ def delete_autoscale(
     )
 
     request_delete_autoscale(endpoint_name=endpoint_name, api_url=api_url, token=token)
-    print(f"Autoscale for {endpoint_name} deleted")
+    print(f"Autoscale for `{endpoint_name}` deleted")
     response = request_query_endpoint(
         endpoint_name=endpoint_name,
         api_url=api_url,

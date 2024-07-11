@@ -242,7 +242,7 @@ class DeploymentMixin(EnvironmentBuilder):
                 command.extend(
                     [
                         "&&",
-                        "s5cmd",
+                        "/s5cmd",
                         "cp",
                         f"{endpoint_orm.model_path}/*",
                         "/opt/ml/model/",
@@ -252,7 +252,7 @@ class DeploymentMixin(EnvironmentBuilder):
                 command.extend(
                     [
                         "&&",
-                        "s5cmd",
+                        "/s5cmd",
                         "cp",
                         endpoint_orm.model_path,
                         "/opt/ml/model/",
@@ -418,6 +418,15 @@ class KubeSpawner(Spawner, DeploymentMixin):
 
     async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
         status = await self.inspect_deployment_status(endpoint_name)
+        if not status:
+            logger.warning(f"Deployment not found: {endpoint_name}.")
+            return EndpointRuntimeInfo(
+                total_replicas_nums=0,
+                updated_replicas_nums=0,
+                avaliable_replicas_nums=0,
+                unavailable_replicas_nums=0,
+            )
+
         return EndpointRuntimeInfo(
             total_replicas_nums=status.replicas or 0,
             updated_replicas_nums=status.updated_replicas or 0,
