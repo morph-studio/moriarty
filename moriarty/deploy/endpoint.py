@@ -9,9 +9,10 @@ from moriarty.matrix.operator_.params import (
     ScheduleScope,
     SidecarScope,
 )
+from moriarty.tools import FlexibleModel
 
 
-class Endpoint(BaseModel):
+class Endpoint(FlexibleModel):
     endpoint_name: str
     image: str
     model_path: Optional[str] = None
