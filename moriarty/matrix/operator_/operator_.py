@@ -328,7 +328,14 @@ class Operator:
         self.session.add(endpoint_orm)
         await self.session.commit()
         await self.session.refresh(endpoint_orm)
-        await self.spawner.create(endpoint_orm)
+        try:
+            await self.spawner.create(endpoint_orm)
+        except Exception as e:
+            logger.exception(e)
+            logger.info(f"Rollback create endpoint: {endpoint_orm.endpoint_name}")
+            await self.session.delete(endpoint_orm)
+            await self.session.commit()
+            raise e
 
     async def update_endpoint(self, endpoint_name: str, params: UpdateEndpointParams) -> None:
         endpoint_orm = await self.get_endpoint_orm(endpoint_name)
@@ -422,7 +429,13 @@ class Operator:
         )
         await self.session.commit()
         await self.session.refresh(endpoint_orm)
-        await self.spawner.update(endpoint_orm, need_restart=params.need_restart)
+        try:
+            await self.spawner.update(endpoint_orm, need_restart=params.need_restart)
+        except Exception as e:
+            logger.exception(e)
+            logger.warning(f"Failed to update deployment but already update db. Try update again.")
+            raise
+
         return await self.get_endpoint_info(endpoint_orm)
 
     async def delete_endpoint(self, endpoint_name: str) -> None:

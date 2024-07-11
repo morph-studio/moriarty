@@ -107,7 +107,7 @@ class DeploymentMixin(EnvironmentBuilder):
 
         async with ApiClient() as api:
             v1_apps = client.AppsV1Api(api)
-            v1_apps.patch_namespaced_deployment(deployment, namespace, body, pretty="true")
+            await v1_apps.patch_namespaced_deployment(deployment, namespace, body, pretty="true")
 
     async def scale_deployment(self, endpoint_name: str, target_replicas: int) -> None:
         deployment = self.get_deployment_name(endpoint_name)
@@ -242,7 +242,7 @@ class DeploymentMixin(EnvironmentBuilder):
                 command.extend(
                     [
                         "&&",
-                        "s5cmd",
+                        "/s5cmd",
                         "cp",
                         f"{endpoint_orm.model_path}/*",
                         "/opt/ml/model/",
@@ -252,7 +252,7 @@ class DeploymentMixin(EnvironmentBuilder):
                 command.extend(
                     [
                         "&&",
-                        "s5cmd",
+                        "/s5cmd",
                         "cp",
                         endpoint_orm.model_path,
                         "/opt/ml/model/",
@@ -418,6 +418,15 @@ class KubeSpawner(Spawner, DeploymentMixin):
 
     async def get_runtime_info(self, endpoint_name: str) -> EndpointRuntimeInfo:
         status = await self.inspect_deployment_status(endpoint_name)
+        if not status:
+            logger.warning(f"Deployment not found: {endpoint_name}.")
+            return EndpointRuntimeInfo(
+                total_replicas_nums=0,
+                updated_replicas_nums=0,
+                avaliable_replicas_nums=0,
+                unavailable_replicas_nums=0,
+            )
+
         return EndpointRuntimeInfo(
             total_replicas_nums=status.replicas or 0,
             updated_replicas_nums=status.updated_replicas or 0,
