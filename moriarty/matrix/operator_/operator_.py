@@ -131,6 +131,7 @@ class Bridger(EndpointMixin, AutoscaleMixin):
                 )
             ).scalar_one_or_none() is not None
             if is_processed:
+                logger.info(f"Job already processed: {job}, skip")
                 return
 
             await self.job_producer.invoke(
@@ -144,6 +145,7 @@ class Bridger(EndpointMixin, AutoscaleMixin):
             )
             self.session.add(log_orm)
             await self.session.commit()
+            logger.debug(f"Inference job logged: {job}")
 
         logger.info(f"Bridge endpoint: {endpoint_name}")
         while await self.has_capacity(endpoint_name):
