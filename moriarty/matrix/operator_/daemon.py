@@ -105,7 +105,7 @@ class DaemonMixin:
 
 
 class KubeAutoscalerDaemon(DaemonMixin):
-    interval = 60
+    interval = 5
 
     def __init__(self, config: Config) -> None:
         super().__init__()
@@ -131,7 +131,7 @@ class KubeAutoscalerDaemon(DaemonMixin):
 
 
 class BridgeDaemon(DaemonMixin):
-    interval = 3
+    interval = 1
 
     def __init__(self, config: Config) -> None:
         super().__init__()
