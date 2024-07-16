@@ -152,7 +152,7 @@ def query(
 )
 @click.option(
     "--restart",
-    default=True,
+    default=False,
     help="Restart endpoint",
     type=bool,
     is_flag=True,
