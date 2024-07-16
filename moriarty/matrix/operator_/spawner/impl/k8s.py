@@ -171,6 +171,7 @@ class DeploymentMixin(EnvironmentBuilder):
                 spec=client.V1PodSpec(
                     restart_policy="Always",
                     affinity=self._make_affinity(endpoint_orm),
+                    termination_grace_period_seconds=endpoint_orm.process_timeout,
                     node_selector=(
                         client.V1NodeSelector(
                             match_labels={k: v for k, v in endpoint_orm.node_labels.items() if v}
