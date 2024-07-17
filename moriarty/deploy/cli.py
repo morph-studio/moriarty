@@ -205,6 +205,9 @@ def deploy_or_update(
             token=token,
         )
         print(f"Set autoscale for endpoint: {endpoint_name}")
+    else:
+        request_delete_autoscale(endpoint_name=endpoint_name, api_url=api_url, token=token)
+        print(f"No autoscale for endpoint: {endpoint_name}")
 
 
 @click.command()
