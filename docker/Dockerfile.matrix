@@ -16,3 +16,4 @@ COPY --from=builder /source/dist/*.whl /tmp/
 RUN pip install --no-cache-dir $(echo /tmp/*.whl)[matrix]
 
 ENTRYPOINT [ "tini", "--" ]
+LABEL org.opencontainers.image.source=https://github.com/Wh1isper/moriarty

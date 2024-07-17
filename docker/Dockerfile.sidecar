@@ -18,3 +18,4 @@ RUN pip install --no-cache-dir $(echo /tmp/*.whl)
 
 ENTRYPOINT [ "tini", "--" ]
 CMD [ "moriarty-sidecar", "start" ]
+LABEL org.opencontainers.image.source=https://github.com/Wh1isper/moriarty

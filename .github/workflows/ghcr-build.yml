@@ -1,4 +1,4 @@
-name: Build latest images automatically
+name: (ghcr)Build latest images automatically
 
 on:
     push:
