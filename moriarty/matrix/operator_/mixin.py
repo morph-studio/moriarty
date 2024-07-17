@@ -77,6 +77,9 @@ class EndpointMixin:
             )
         ).scalar_one_or_none()
 
+    async def get_scaleable_endpoints(self) -> list[str]:
+        return (await self.session.execute(select(AutoscalerORM.endpoint_name))).scalars().all()
+
     async def get_avaliable_endpoints(self) -> list[str]:
         endpoint_names = (
             (
@@ -89,7 +92,10 @@ class EndpointMixin:
             .scalars()
             .all()
         )
-        return endpoint_names
+
+        endpoint_names += await self.get_scaleable_endpoints()
+
+        return list(set(endpoint_names))
 
 
 class AutoscaleMixin:
