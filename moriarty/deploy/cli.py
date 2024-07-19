@@ -3,6 +3,7 @@ import click
 from moriarty.deploy.config import ConfigLoader
 from moriarty.deploy.endpoint import Endpoint
 from moriarty.envs import MORIARTY_MATRIX_API_URL_ENV, MORIARTY_MATRIX_TOKEN_ENV
+from moriarty.log import logger
 from moriarty.matrix.operator_.enums_ import MetricType
 from moriarty.matrix.operator_.params import CreateEndpointParams, UpdateEndpointParams
 
@@ -179,6 +180,7 @@ def deploy_or_update(
         update_params.need_restart = restart
 
         if request_query_autoscale(endpoint_name=endpoint_name, api_url=api_url, token=token):
+            logger.info(f"Endpoint: {endpoint_name} has autoscale, update params will be ignored")
             update_params.replicas = None
 
         request_update_endpoint_with_params(
