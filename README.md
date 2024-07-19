@@ -50,7 +50,7 @@ CLIs:
 
 Or use docker image
 
-`docker pull wh1isper/moriarty` or `docker pull ghcr.io/wh1isper/moriarty:dev`
+`docker pull wh1isper/moriarty` or `docker pull ghcr.io/wh1isper/moriarty`
 
 > `docker pull wh1isper/moriarty:dev` for developing version
 
