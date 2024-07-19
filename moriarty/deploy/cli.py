@@ -176,6 +176,7 @@ def deploy_or_update(
         api_url=api_url,
         token=token,
     ):
+        logger.info(f"Endpoint: {endpoint_name} exists, update params will be applied")
         update_params = UpdateEndpointParams.model_validate(endpoint)
         update_params.need_restart = restart
 

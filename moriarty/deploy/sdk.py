@@ -176,7 +176,7 @@ def request_query_autoscale(
     token: str = None,
 ) -> QueryEndpointAutoscaleResponse | None:
     response = httpx.get(
-        urljoin(api_url, f"/endpoint/{endpoint_name}/autoscale"),
+        urljoin(api_url, f"/autoscale/{endpoint_name}/info"),
         headers=_make_headers(token),
         follow_redirects=True,
     )
