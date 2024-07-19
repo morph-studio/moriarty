@@ -177,6 +177,10 @@ def deploy_or_update(
     ):
         update_params = UpdateEndpointParams.model_validate(endpoint)
         update_params.need_restart = restart
+
+        if request_query_autoscale(endpoint_name=endpoint_name, api_url=api_url, token=token):
+            update_params.replicas = None
+
         request_update_endpoint_with_params(
             endpoint_name=endpoint_name,
             api_url=api_url,
