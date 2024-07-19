@@ -331,6 +331,7 @@ class DeploymentMixin(EnvironmentBuilder):
                 requests={
                     "cpu": f"{endpoint_orm.cpu_request}",
                     "memory": f"{endpoint_orm.memory_request}Mi",
+                    **gpu_limit,
                 },
                 limits={
                     **cpu_limit,
