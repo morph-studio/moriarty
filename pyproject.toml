@@ -47,7 +47,7 @@ test = [
     "moriarty[matrix]",
     "docker",
     "pytest-cov",
-    "boto3-stubs[sqs]",
+    "boto3-stubs[sqs,s3]",
 ]
 docs = ["Sphinx", "pydata-sphinx-theme", "sphinx-click", "autodoc_pydantic"]
 
