@@ -7,6 +7,8 @@ import json
 import uuid
 from typing import Awaitable
 
+from moriarty.tools import parse_s3_path
+
 try:
     from functools import cache
 except ImportError:
@@ -150,7 +152,7 @@ class SQSBridge(QueueBridge):
                 raise RuntimeError(
                     "Cannot handle big content without output bucket, please set MORIARTY_BRIDGE_OUTPUT_BUCKET env"
                 )
-            response_body["content"] = "Content too long, dropped."
+            response_body["content"] = "Content too long, will upload to S3"
             if "encoding" in response_body:
                 del response_body["encoding"]
 
@@ -164,12 +166,11 @@ class SQSBridge(QueueBridge):
 
         if self.output_bucket:
             output_location = await self._upload_to_s3(result.payload)
-            message_content["responseParameters"] = (
-                {
-                    "contentType": "text/plain; charset=utf-8",
-                    "outputLocation": output_location,
-                },
-            )
+            message_content["responseParameters"] = {
+                "contentType": "text/plain; charset=utf-8",
+                "outputLocation": output_location,
+            }
+
         message = {"Message": json.dumps(message_content)}
         await run_in_threadpool(
             self.client.send_message,
@@ -191,13 +192,24 @@ class SQSBridge(QueueBridge):
         def _():
             s3_client = boto3.client("s3")
             fp.seek(0)
+            key = f"moriarty-async-inference/output/{uuid.uuid4().hex}.out"
             s3_client.upload_fileobj(
                 Fileobj=fp,
                 Bucket=self.output_bucket,
-                Key=f"moriarty-async-inference/output/{uuid.uuid4().hex}.out",
+                Key=key,
             )
+            return f"s3://{self.output_bucket}/{key}"
 
-        await run_in_threadpool(_)
+        return await run_in_threadpool(_)
+
+    async def _get_s3_content(self, output_location: str) -> str:
+        def _():
+            s3_resource = boto3.resource("s3")
+            bucket_name, object_name = parse_s3_path(output_location)
+            response = s3_resource.Object(bucket_name, object_name).get()
+            return response["Body"].read().decode("utf-8")
+
+        return await run_in_threadpool(_)
 
     async def dequeue_result(self, process_func: Awaitable[InferenceResult], size: int = 10) -> int:
         logger.debug(f"Polling result from queue: {self.bridge_result_queue_url}")
@@ -324,8 +336,27 @@ class SQSBridge(QueueBridge):
                 )
                 continue
             except Exception as e:
-                logger.error(f"Cannot parse inference result {message}.")
-                logger.exception(e)
+                logger.info(f"Cannot parse inference result {message}, try output location.")
+                output_location = message["responseParameters"].get("outputLocation")
+                if not output_location:
+                    logger.error(
+                        f"Neither response body parsed nor output location, can't handle now: {message}"
+                    )
+                    logger.exception(e)
+                    continue
+
+                inference_result = InferenceResult(
+                    inference_id=message["inferenceId"],
+                    status=InferenceResultStatus.COMPLETED,
+                    message=message["responseBody"]["message"],
+                    payload=await self._get_s3_content(output_location),
+                )
+                valid_messages.append(
+                    (
+                        inference_result,
+                        receipt_handle,
+                    )
+                )
                 continue
 
         return valid_messages

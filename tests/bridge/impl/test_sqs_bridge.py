@@ -1,3 +1,6 @@
+import json
+import uuid
+
 import pytest
 
 from moriarty.matrix.job_manager.bridge.impl.sqs_bridge import SQSBridge
@@ -94,6 +97,61 @@ async def test_bridge_result(
     endpoint_name,
     priority,
 ):
+    _called = False
+
+    await sqs_bridge.enqueue_result(inference_result)
+
+    async def _process_func(result: InferenceResult):
+        nonlocal _called
+        _called = True
+        assert result == inference_result
+
+    await sqs_bridge.list_avaliable_priorities(endpoint_name) == [priority]
+    await sqs_bridge.dequeue_result(_process_func)
+
+    assert _called
+
+    await sqs_bridge.list_avaliable_priorities(endpoint_name) == []
+
+
+@pytest.fixture
+def result_bucket(monkeypatch, case_id):
+    try:
+        import boto3
+
+        s3_client = boto3.client("s3")
+    except ImportError:
+        pytest.skip("boto3 is not installed")
+    except Exception:
+        pytest.skip("boto3 is not configured")
+
+    bucket_name = f"moriarty-test"
+    try:
+        # Check if bucket exists
+        s3_client.head_bucket(Bucket=bucket_name)
+    except Exception as e:
+        pytest.skip(f"Bucket not found {e}")
+    monkeypatch.setattr(SQSBridge, "output_bucket", bucket_name)
+    yield bucket_name
+
+
+async def test_bridge_big_result(
+    sqs_bridge: SQSBridge,
+    endpoint_name,
+    priority,
+    result_bucket,
+):
+    inference_result = InferenceResult(
+        inference_id="test",
+        status=InferenceResultStatus.COMPLETED,
+        message="Oh Too big",
+        payload=json.dumps(
+            {
+                "output": "1" * 1024 * 1024,  # Bigger than 256KB
+            }
+        ),
+    )
+
     _called = False
 
     await sqs_bridge.enqueue_result(inference_result)
