@@ -51,3 +51,11 @@ class FlexibleModel(BaseModel):
         from_attributes=True,
         protected_namespaces=(),
     )
+
+
+def parse_s3_path(s3_path: str):
+    """
+    e.g. s3://bucket/object
+    """
+    bucket_name, object_name = s3_path.replace("s3://", "").split("/", 1)
+    return bucket_name, object_name

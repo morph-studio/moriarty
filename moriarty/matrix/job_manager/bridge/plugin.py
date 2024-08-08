@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Awaitable
 
 import pluggy
@@ -72,6 +73,7 @@ class QueueBridge:
     """
 
     register_name: str
+    output_bucket = os.getenv("MORIARTY_BRIDGE_OUTPUT_BUCKET")
 
     def __init__(
         self,

@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
 import json
+import uuid
 from typing import Awaitable
+
+from moriarty.tools import parse_s3_path
 
 try:
     from functools import cache
 except ImportError:
     from functools import lru_cache as cache
 
+import boto3
 from fastapi.concurrency import run_in_threadpool
 
 from moriarty.log import logger
@@ -141,19 +146,32 @@ class SQSBridge(QueueBridge):
                 "message": result.message,
             }
         )
+        # If content is bigger than 255KB, drop it
+        if len(response_body["content"]) > 255 * 1024:
+            if not self.output_bucket:
+                raise RuntimeError(
+                    "Cannot handle big content without output bucket, please set MORIARTY_BRIDGE_OUTPUT_BUCKET env"
+                )
+            response_body["content"] = "Content too long, will upload to S3"
+            if "encoding" in response_body:
+                del response_body["encoding"]
 
-        message = {
-            "Message": json.dumps(
-                {
-                    "invocationStatus": invocation_status,
-                    "eventName": "InferenceResult",
-                    "responseBody": response_body,
-                    "inferenceId": result.inference_id,
-                    "eventName": "InferenceResult",
-                }
-            )
+        message_content = {
+            "invocationStatus": invocation_status,
+            "eventName": "InferenceResult",
+            "responseBody": response_body,
+            "inferenceId": result.inference_id,
+            "eventName": "InferenceResult",
         }
 
+        if self.output_bucket:
+            output_location = await self._upload_to_s3(result.payload)
+            message_content["responseParameters"] = {
+                "contentType": "text/plain; charset=utf-8",
+                "outputLocation": output_location,
+            }
+
+        message = {"Message": json.dumps(message_content)}
         await run_in_threadpool(
             self.client.send_message,
             QueueUrl=self.bridge_result_queue_url,
@@ -161,6 +179,37 @@ class SQSBridge(QueueBridge):
         )
         logger.debug(f"Result {result.inference_id} enqueued")
         return result.inference_id
+
+    async def _upload_to_s3(self, payload: str | None):
+        if payload is None:
+            return None
+
+        if not payload:
+            payload = ""
+
+        fp = io.BytesIO(payload.encode())
+
+        def _():
+            s3_client = boto3.client("s3")
+            fp.seek(0)
+            key = f"moriarty-async-inference/output/{uuid.uuid4().hex}.out"
+            s3_client.upload_fileobj(
+                Fileobj=fp,
+                Bucket=self.output_bucket,
+                Key=key,
+            )
+            return f"s3://{self.output_bucket}/{key}"
+
+        return await run_in_threadpool(_)
+
+    async def _get_s3_content(self, output_location: str) -> str:
+        def _():
+            s3_resource = boto3.resource("s3")
+            bucket_name, object_name = parse_s3_path(output_location)
+            response = s3_resource.Object(bucket_name, object_name).get()
+            return response["Body"].read().decode("utf-8")
+
+        return await run_in_threadpool(_)
 
     async def dequeue_result(self, process_func: Awaitable[InferenceResult], size: int = 10) -> int:
         logger.debug(f"Polling result from queue: {self.bridge_result_queue_url}")
@@ -287,8 +336,27 @@ class SQSBridge(QueueBridge):
                 )
                 continue
             except Exception as e:
-                logger.error(f"Cannot parse inference result {message}.")
-                logger.exception(e)
+                logger.info(f"Cannot parse inference result {message}, try output location.")
+                output_location = message["responseParameters"].get("outputLocation")
+                if not output_location:
+                    logger.error(
+                        f"Neither response body parsed nor output location, can't handle now: {message}"
+                    )
+                    logger.exception(e)
+                    continue
+
+                inference_result = InferenceResult(
+                    inference_id=message["inferenceId"],
+                    status=InferenceResultStatus.COMPLETED,
+                    message=message["responseBody"]["message"],
+                    payload=await self._get_s3_content(output_location),
+                )
+                valid_messages.append(
+                    (
+                        inference_result,
+                        receipt_handle,
+                    )
+                )
                 continue
 
         return valid_messages
