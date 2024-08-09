@@ -72,6 +72,9 @@ class SQSBridge(QueueBridge):
             response = self.client.list_queues(
                 QueueNamePrefix=self._get_queue_url_prefix(endpoint_name)
             )
+            if "QueueUrls" not in response:
+                return priorities
+
             while response["QueueUrls"]:
                 for url in response["QueueUrls"]:
                     response = self.client.get_queue_attributes(
