@@ -67,12 +67,18 @@ def register(manager):
 
 
 class EnvironmentBuilder:
-    model_s3_access_key_id = os.getenv(MODEL_S3_ACCESS_KEY_ID_ENV) or os.getenv("AWS_ACCESS_KEY_ID")
+    model_s3_access_key_id = os.getenv(MODEL_S3_ACCESS_KEY_ID_ENV) or os.getenv(
+        "AWS_ACCESS_KEY_ID"
+    )
     model_s3_secret_access_key = os.getenv(MODEL_S3_SECRET_ACCESS_KEY_ENV) or os.getenv(
         "AWS_SECRET_ACCESS_KEY"
     )
-    model_s3_endpoint_url = os.getenv(MODEL_S3_ENDPOINT_URL_ENV) or os.getenv("AWS_S3_ENDPOINT_URL")
-    model_aws_region_name = os.getenv(MODEL_AWS_REGION_ENV) or os.getenv("AWS_REGION_NAME")
+    model_s3_endpoint_url = os.getenv(MODEL_S3_ENDPOINT_URL_ENV) or os.getenv(
+        "AWS_S3_ENDPOINT_URL"
+    )
+    model_aws_region_name = os.getenv(MODEL_AWS_REGION_ENV) or os.getenv(
+        "AWS_REGION_NAME"
+    )
 
     def build_sidecar_environment(self, endpoint_orm: "EndpointORM") -> dict[str, str]:
         return {
@@ -99,6 +105,10 @@ class EnvironmentBuilder:
                     PROCESS_TIMEOUT_ENV: endpoint_orm.process_timeout,
                     HEALTH_CHECK_TIMEOUT_ENV: endpoint_orm.health_check_timeout,
                     HEALTH_CHECK_INTERVAL_ENV: endpoint_orm.health_check_interval,
+                    # For Spawner
+                    MORIARTY_BRIDGE_OUTPUT_BUCKET_ENV: os.getenv(
+                        MORIARTY_BRIDGE_OUTPUT_BUCKET_ENV
+                    ),
                 }.items()
                 if v is not None
             },
@@ -137,7 +147,9 @@ class Spawner:
     async def create(self, endpoint_orm: "EndpointORM") -> None:
         raise NotImplementedError
 
-    async def update(self, endpoint_orm: "EndpointORM", need_restart: bool = True) -> None:
+    async def update(
+        self, endpoint_orm: "EndpointORM", need_restart: bool = True
+    ) -> None:
         raise NotImplementedError
 
     async def delete(self, endpoint_name: str) -> None:
