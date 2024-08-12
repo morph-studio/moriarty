@@ -5,6 +5,7 @@ from typing import Awaitable
 
 import pluggy
 
+from moriarty.envs import MORIARTY_BRIDGE_OUTPUT_BUCKET_ENV
 from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
 
 project_name = "moriarty.matrix.bridge"
@@ -73,7 +74,7 @@ class QueueBridge:
     """
 
     register_name: str
-    output_bucket = os.getenv("MORIARTY_BRIDGE_OUTPUT_BUCKET")
+    output_bucket = os.getenv(MORIARTY_BRIDGE_OUTPUT_BUCKET_ENV)
 
     def __init__(
         self,
