@@ -99,8 +99,6 @@ class EnvironmentBuilder:
                     PROCESS_TIMEOUT_ENV: endpoint_orm.process_timeout,
                     HEALTH_CHECK_TIMEOUT_ENV: endpoint_orm.health_check_timeout,
                     HEALTH_CHECK_INTERVAL_ENV: endpoint_orm.health_check_interval,
-                    # For Spawner
-                    MORIARTY_BRIDGE_OUTPUT_BUCKET_ENV: os.getenv(MORIARTY_BRIDGE_OUTPUT_BUCKET_ENV),
                 }.items()
                 if v is not None
             },
