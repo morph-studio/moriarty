@@ -102,7 +102,10 @@ class Bridger(EndpointMixin, AutoscaleMixin):
 
     async def bridge_all(self) -> None:
         for endpoint_name in await self.get_avaliable_endpoints():
-            await self.bridge_one(endpoint_name)
+            try:
+                await self.bridge_one(endpoint_name)
+            except Exception as e:
+                logger.exception(e)
 
     async def has_capacity(self, endpoint_name: str) -> bool:
         endpoint_orm = await self.get_endpoint_orm(endpoint_name)
