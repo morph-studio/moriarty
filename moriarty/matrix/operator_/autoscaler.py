@@ -112,6 +112,7 @@ class AutoscalerManager(EndpointMixin, CooldownMixin):
             return
 
         metrics = await self.metrics_manager.get_metrics(endpoint_name)
+        logger.debug(f"Metrics Collected: {metrics}")
         target_replicas = await self._calculate_target_replicas(endpoint_name, metrics)
         if target_replicas is None or await self._is_cooldown(endpoint_name, target_replicas):
             return

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from moriarty.log import logger
 from moriarty.matrix.operator_.enums_ import MetricType
 from moriarty.matrix.operator_.orm import AutoscalerORM, EndpointORM
 from moriarty.matrix.operator_.spawner import plugin
@@ -48,6 +49,9 @@ class MetricsManager:
         current_metric_value: float | int,
         metric_threshold: float,
     ) -> int:
+        logger.debug(
+            f"Calculating least replicas:`{metric}`(current `{current_metric_value}` threshold `{metric_threshold}`)"
+        )
         if metric == MetricType.pending_jobs:
             return int(current_metric_value - int(metric_threshold))
         if metric == MetricType.pending_jobs_per_instance:
