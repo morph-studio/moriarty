@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 from typing import Awaitable
 
-from moriarty.envs import MORIARTY_BRIDGE_OUTPUT_BUCKET_ENV
 import pluggy
 
+from moriarty.envs import MORIARTY_BRIDGE_OUTPUT_BUCKET_ENV
 from moriarty.matrix.job_manager.params import InferenceJob, InferenceResult
 
 project_name = "moriarty.matrix.bridge"
