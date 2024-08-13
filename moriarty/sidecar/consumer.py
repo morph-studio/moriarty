@@ -72,7 +72,7 @@ class InferencerConsumer:
         if not inference_id:
             return await self.return_no_inference_id_error(payload)
         async with httpx.AsyncClient() as client:
-            logger.debug(f"Invoke endpoint: {self.invoke_url}")
+            logger.info(f"Invoke endpoint: {self.invoke_url}")
             try:
                 response = await client.post(
                     self.invoke_url,
@@ -86,7 +86,7 @@ class InferencerConsumer:
                 await self._callback(MatrixCallback.from_exception(inference_id, e))
                 return None
             else:
-                logger.debug(f"Invoke endpoint response status: {response.status_code}")
+                logger.info(f"Invoke endpoint response status: {response.status_code}")
                 await self._callback(MatrixCallback.from_response(inference_id, response))
                 return response.json()
 
@@ -101,13 +101,15 @@ class InferencerConsumer:
     async def _callback(self, callback_params: MatrixCallback) -> None:
         async with httpx.AsyncClient(follow_redirects=True) as client:
             try:
+                logger.info(f"Callback for finished inference: {self.callback_url}")
                 await client.post(
                     self.callback_url,
                     data=callback_params.model_dump_json(),
                     timeout=60,
                 )
-            except httpx.ConnectError as e:
+            except Exception as e:
                 logger.error(f"Callback failed: {e}")
+                logger.exception(e)
 
     async def run_forever(self) -> None:
         try:
@@ -128,8 +130,8 @@ class InferencerConsumer:
             while True:
                 try:
                     await client.get(self.health_check_path, timeout=60)
-                    logger.debug(f"Ping {self.health_check_path} succeeded")
+                    logger.info(f"Ping {self.health_check_path} succeeded")
                     break
                 except httpx.ConnectError as e:
-                    logger.debug(f"Ping {self.health_check_path} failed: {e}")
+                    logger.info(f"Ping {self.health_check_path} failed: {e}")
                     await asyncio.sleep(self.health_check_interval)
