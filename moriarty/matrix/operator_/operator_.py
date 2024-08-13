@@ -452,17 +452,3 @@ class Operator:
         )
         await self.session.commit()
         await self.autoscaler_manager.delete(endpoint_name)
-
-    async def handle_callback(self, callback: MatrixCallback) -> None:
-        await self.bridger.bridge_result(callback)
-        await self.session.execute(
-            update(InferenceLogORM)
-            .where(InferenceLogORM.inference_id == callback.inference_id)
-            .values(
-                status=callback.status,
-                callback_response=callback.model_dump(),
-                finished_at=func.now(),
-            )
-        )
-        await self.session.commit()
-        logger.info(f"Callback handled: {callback}")
