@@ -53,7 +53,11 @@ class CallbackManager:
 
     async def handle_callback(self, payload: str) -> None:
         callback = MatrixCallback.model_validate_json(payload)
-        await self._handle_callback(callback)
+        try:
+            await self._handle_callback(callback)
+        except Exception as e:
+            logger.exception(e)
+            await self.session.rollback()
 
     async def _handle_callback(self, callback: MatrixCallback) -> None:
         await self.bridger.bridge_result(callback)
