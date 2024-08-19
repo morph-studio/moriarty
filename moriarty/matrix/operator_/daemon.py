@@ -1,11 +1,16 @@
 import asyncio
 import contextlib
+import os
 import signal
 
 import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from moriarty.envs import get_bridge_name
+from moriarty.envs import (
+    MORIARTY_AUTOSCALER_INTERVAL_ENV,
+    MORIARTY_BRIDGE_INTERVAL_ENV,
+    get_bridge_name,
+)
 from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge_wrapper import (
     get_bridge_manager,
@@ -105,7 +110,7 @@ class DaemonMixin:
 
 
 class KubeAutoscalerDaemon(DaemonMixin):
-    interval = 5
+    interval = float(os.getenv(MORIARTY_AUTOSCALER_INTERVAL_ENV, 60))
 
     def __init__(self, config: Config) -> None:
         super().__init__()
@@ -131,7 +136,7 @@ class KubeAutoscalerDaemon(DaemonMixin):
 
 
 class BridgeDaemon(DaemonMixin):
-    interval = 1
+    interval = float(os.getenv(MORIARTY_BRIDGE_INTERVAL_ENV, 1))
 
     def __init__(self, config: Config) -> None:
         super().__init__()
