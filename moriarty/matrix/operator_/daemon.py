@@ -128,7 +128,7 @@ class KubeAutoscalerDaemon(DaemonMixin):
     async def run(self):
         logger.info(f"Triggering autoscaler...")
         async with open_redis_client(self.config) as redis_client:
-            async with open_db_session(self.config) as session:
+            async with open_db_session(self.config, {"pool_pre_ping": True}) as session:
                 autoscaler = AutoscalerManager(
                     redis_client=redis_client, session=session, spawner=self.spawner
                 )
@@ -155,7 +155,7 @@ class BridgeDaemon(DaemonMixin):
         logger.debug(f"Triggering bridge...")
 
         async with open_redis_client(self.config) as redis_client:
-            async with open_db_session(self.config) as session:
+            async with open_db_session(self.config, {"pool_pre_ping": True}) as session:
                 bridger = Bridger(
                     spawner=self.spawner,
                     bridge_name=self.bridge_name,
