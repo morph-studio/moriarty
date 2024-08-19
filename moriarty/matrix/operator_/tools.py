@@ -6,7 +6,6 @@ _config_loaded = False
 
 
 async def load_kube_config() -> None:
-    return
     global _config_loaded
     if _config_loaded:
         return
