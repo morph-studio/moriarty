@@ -6,7 +6,7 @@ from glob import glob
 from pathlib import Path
 from subprocess import check_call
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING, Any, AsyncGenerator
 from urllib.parse import urlparse
 
 import alembic.command
@@ -194,8 +194,12 @@ async def get_db_session(
 @asynccontextmanager
 async def open_db_session(
     config: Config,
+    engine_kwargs: dict[str, Any] | None = None,
 ) -> AsyncGenerator[AsyncSession, None]:
-    engine = create_async_engine(get_db_url(config, async_mode=True))
+    engine = create_async_engine(
+        get_db_url(config, async_mode=True),
+        **(engine_kwargs or {}),
+    )
     factory = async_sessionmaker(engine)
     async with factory() as session:
         try:

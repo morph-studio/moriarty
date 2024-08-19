@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     )
     config = get_config()
 
-    async with open_db_session(config) as session:
+    async with open_db_session(config, {"pool_pre_ping": True}) as session:
         async with open_redis_client(config) as redis_client:
             bridger = get_bridger_dep(
                 spawner=spawner,
