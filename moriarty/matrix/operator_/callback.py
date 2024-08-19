@@ -58,6 +58,7 @@ class CallbackManager:
         except Exception as e:
             logger.exception(e)
             await self.session.rollback()
+            raise
 
     async def _handle_callback(self, callback: MatrixCallback) -> None:
         await self.bridger.bridge_result(callback)
