@@ -30,6 +30,8 @@ class DeploymentMixin(EnvironmentBuilder):
     init_image = os.getenv("INIT_IMAGE", "peakcom/s5cmd")
     sidecar_image = os.getenv("SIDECAR_IMAGE", "wh1isper/moriarty-sidecar")
     image_pull_secrets = os.getenv("IMAGE_PULL_SECRETS")
+    S5_NUMWORKS = int(os.getenv("S5_NUMWORKERS", 5))
+    S5_CONCURRENCY = int(os.getenv("S5_CONCURRENCY", 1))
 
     def _escape_string(self, s: str) -> str:
         safe_chars = set(string.ascii_lowercase + string.digits)
@@ -244,9 +246,9 @@ class DeploymentMixin(EnvironmentBuilder):
                     "&&",
                     "/s5cmd",
                     "--numworkers",
-                    "5",
+                    f"{self.S5_NUMWORKS}",
                     "--concurrency",
-                    "1",
+                    f"{self.S5_CONCURRENCY}",
                     "cp",
                     (
                         f"{endpoint_orm.model_path}*"
