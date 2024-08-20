@@ -243,6 +243,10 @@ class DeploymentMixin(EnvironmentBuilder):
                 [
                     "&&",
                     "/s5cmd",
+                    "--numworkers",
+                    "10",
+                    "--concurrency",
+                    "1",
                     "cp",
                     (
                         f"{endpoint_orm.model_path}*"
