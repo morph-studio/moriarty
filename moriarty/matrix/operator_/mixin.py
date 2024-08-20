@@ -18,6 +18,7 @@ from moriarty.sidecar.producer import JobProducer
 class EndpointMetrics(BaseModel):
     endpoint_name: str
     metrics: dict[MetricType, float] = dict()
+    replicas: int
 
 
 class MetricsManager:
@@ -41,6 +42,7 @@ class MetricsManager:
                 MetricType.pending_jobs: unprocessed_count,
                 MetricType.pending_jobs_per_instance: unprocessed_count / replicas,
             },
+            replicas=replicas,
         )
 
     def calculate_least_replicas(
