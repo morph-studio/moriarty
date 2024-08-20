@@ -186,6 +186,7 @@ class AutoscalerManager(EndpointMixin, CooldownMixin):
             metric=autoscaler_orm.metrics,
             current_metric_value=current_metric,
             metric_threshold=autoscaler_orm.metrics_threshold,
+            current_instance_value=current_metrics.replicas,
         )
         logger.info(
             f"Least replicas calculated for {autoscaler_orm.endpoint_name}({autoscaler_orm.metrics}) is {least_replicas}"

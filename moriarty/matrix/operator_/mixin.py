@@ -18,6 +18,7 @@ from moriarty.sidecar.producer import JobProducer
 class EndpointMetrics(BaseModel):
     endpoint_name: str
     metrics: dict[MetricType, float] = dict()
+    replicas: int
 
 
 class MetricsManager:
@@ -41,6 +42,7 @@ class MetricsManager:
                 MetricType.pending_jobs: unprocessed_count,
                 MetricType.pending_jobs_per_instance: unprocessed_count / replicas,
             },
+            replicas=replicas,
         )
 
     def calculate_least_replicas(
@@ -48,6 +50,7 @@ class MetricsManager:
         metric: MetricType,
         current_metric_value: float | int,
         metric_threshold: float,
+        current_instance_value: int,
     ) -> int:
         logger.debug(
             f"Calculating least replicas:`{metric}`(current `{current_metric_value}` threshold `{metric_threshold}`)"
@@ -57,7 +60,7 @@ class MetricsManager:
         if metric == MetricType.pending_jobs_per_instance:
             if metric_threshold == 0:
                 metric_threshold = 1
-            return math.ceil(current_metric_value / metric_threshold)
+            return math.ceil(current_metric_value * current_instance_value / metric_threshold)
 
         raise NotImplementedError
 
