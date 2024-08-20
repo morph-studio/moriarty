@@ -244,7 +244,7 @@ class DeploymentMixin(EnvironmentBuilder):
                     "&&",
                     "/s5cmd",
                     "--numworkers",
-                    "10",
+                    "5",
                     "--concurrency",
                     "1",
                     "cp",
