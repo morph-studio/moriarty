@@ -247,9 +247,9 @@ class DeploymentMixin(EnvironmentBuilder):
                     "/s5cmd",
                     "--numworkers",
                     f"{self.S5_NUMWORKS}",
+                    "cp",
                     "--concurrency",
                     f"{self.S5_CONCURRENCY}",
-                    "cp",
                     (
                         f"{endpoint_orm.model_path}*"
                         if endpoint_orm.model_path.endswith("/")
