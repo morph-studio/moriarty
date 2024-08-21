@@ -163,6 +163,13 @@ class DeploymentMixin(EnvironmentBuilder):
                     "moriarty.endpoint.deployment": deployment_name,
                 }
             ),
+            strategy=client.V1DeploymentStrategy(
+                type="RollingUpdate",
+                rolling_update=client.V1RollingUpdateDeployment(
+                    max_unavailable=0,
+                    max_surge=1,
+                ),
+            ),
             template=client.V1PodTemplateSpec(
                 metadata=client.V1ObjectMeta(
                     labels={
