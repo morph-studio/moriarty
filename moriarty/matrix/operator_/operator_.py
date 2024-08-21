@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from functools import cached_property
 
@@ -101,11 +102,16 @@ class Bridger(EndpointMixin, AutoscaleMixin):
         return JobProducer(redis_client=self.redis_client)
 
     async def bridge_all(self) -> None:
-        for endpoint_name in await self.get_avaliable_endpoints():
-            try:
-                await self.bridge_one(endpoint_name)
-            except Exception as e:
-                logger.exception(e)
+        avaliable_endpoints = await self.get_avaliable_endpoints()
+        try:
+            await asyncio.gather(
+                *[self.bridge_one(endpoint_name) for endpoint_name in avaliable_endpoints]
+            )
+        except Exception as e:
+            logger.exception(e)
+            await self.session.rollback()
+        else:
+            await self.session.commit()
 
     async def has_capacity(self, endpoint_name: str) -> bool:
         endpoint_orm = await self.get_endpoint_orm(endpoint_name)
@@ -149,11 +155,11 @@ class Bridger(EndpointMixin, AutoscaleMixin):
                 inference_job=job.model_dump(),
             )
             self.session.add(log_orm)
-            await self.session.commit()
             logger.debug(f"Inference job logged: {job}")
 
         logger.info(f"Bridge endpoint: {endpoint_name}")
         while await self.has_capacity(endpoint_name):
+            logger.debug(f"{endpoint_name} has capacity, try to sample job")
             sampled_count = await self.bridge_wrapper.sample_job(
                 bridge=self.bridge_name,
                 endpoint_name=endpoint_name,
@@ -161,7 +167,7 @@ class Bridger(EndpointMixin, AutoscaleMixin):
             )
             if not sampled_count:
                 return
-            logger.debug(f"One job sampled -> {endpoint_name}")
+            logger.debug(f"{sampled_count} job sampled -> {endpoint_name}")
 
     async def bridge_result(self, callback: MatrixCallback) -> None:
         await self.bridge_wrapper.enqueue_result(

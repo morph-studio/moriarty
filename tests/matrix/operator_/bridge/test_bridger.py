@@ -35,7 +35,16 @@ async def test_bridger(bridger: Bridger, bridge_wrapper: BridgeWrapper, mock_end
             },
         ),
     )
-
+    await bridge_wrapper.enqueue_job(
+        bridge=bridger.bridge_name,
+        endpoint_name=mock_endpoint,
+        job=InferenceJob(
+            inference_id="mock2",
+            payload={
+                "data": "mock2",
+            },
+        ),
+    )
     await bridger.bridge_all()
 
-    assert await bridger.job_producer.count_jobs(mock_endpoint) == 1
+    assert await bridger.job_producer.count_jobs(mock_endpoint) == 2
