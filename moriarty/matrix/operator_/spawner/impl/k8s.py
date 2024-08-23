@@ -71,12 +71,8 @@ class DeploymentMixin(EnvironmentBuilder):
             )
             raise
 
-    async def make_and_update_deployment(
-        self,
-        endpoint_orm: EndpointORM,
-        target_replicas: int | None = None,
-    ) -> None:
-        deployment = self._make_deployment(endpoint_orm, target_replicas=target_replicas)
+    async def make_and_update_deployment(self, endpoint_orm: EndpointORM) -> None:
+        deployment = self._make_deployment(endpoint_orm)
         try:
             await self._replace_deployment(deployment)
         except client.rest.ApiException as e:
@@ -115,15 +111,23 @@ class DeploymentMixin(EnvironmentBuilder):
             v1_apps = client.AppsV1Api(api)
             await v1_apps.patch_namespaced_deployment(deployment, namespace, body, pretty="true")
 
+    async def scale_deployment(self, endpoint_name: str, target_replicas: int) -> None:
+        deployment = self.get_deployment_name(endpoint_name)
+        namespace = self.namespace
+        async with ApiClient() as api:
+            v1 = client.AppsV1Api(api)
+            await v1.patch_namespaced_deployment_scale(
+                name=deployment,
+                namespace=namespace,
+                body={"spec": {"replicas": target_replicas}},
+            )
+
     async def _apply_deployment(self, deployment: client.V1Deployment) -> None:
         async with ApiClient() as api:
             v1 = client.AppsV1Api(api)
             await v1.create_namespaced_deployment(namespace=self.namespace, body=deployment)
 
-    async def _replace_deployment(
-        self,
-        deployment: client.V1Deployment,
-    ) -> None:
+    async def _replace_deployment(self, deployment: client.V1Deployment) -> None:
         async with ApiClient() as api:
             v1 = client.AppsV1Api(api)
             await v1.replace_namespaced_deployment(
@@ -133,7 +137,6 @@ class DeploymentMixin(EnvironmentBuilder):
     def _make_deployment(
         self,
         endpoint_orm: EndpointORM,
-        target_replicas: int | None = None,
     ) -> client.V1Deployment:
         deployment_name = self.get_deployment_name(endpoint_orm.endpoint_name)
 
@@ -168,7 +171,7 @@ class DeploymentMixin(EnvironmentBuilder):
             )
 
         deployment.spec = client.V1DeploymentSpec(
-            replicas=target_replicas or endpoint_orm.replicas,
+            replicas=endpoint_orm.replicas,
             selector=client.V1LabelSelector(
                 match_labels={
                     "app": "moriarty",
@@ -452,9 +455,9 @@ class KubeSpawner(Spawner, DeploymentMixin):
             unavailable_replicas_nums=status.unavailable_replicas or 0,
         )
 
-    async def scale(self, endpoint_orm: EndpointORM, target_replicas: int) -> None:
-        logger.info(f"Scale deployment: {endpoint_orm.endpoint_name}.")
-        await self.make_and_update_deployment(endpoint_orm, target_replicas=target_replicas)
+    async def scale(self, endpoint_name: str, target_replicas: int) -> None:
+        logger.info(f"Scale deployment: {endpoint_name}.")
+        await self.scale_deployment(endpoint_name, target_replicas)
 
 
 @hookimpl

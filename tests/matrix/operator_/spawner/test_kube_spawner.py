@@ -47,7 +47,7 @@ async def test_kube_spawner(kube_spawner: KubeSpawner, mock_endpoint_orm):
     # runtime_info = await kube_spawner.get_runtime_info(mock_endpoint_orm.endpoint_name)
     # assert runtime_info.total_replicas_nums == 1
 
-    await kube_spawner.scale(mock_endpoint_orm, 2)
+    await kube_spawner.scale(mock_endpoint_orm.endpoint_name, 2)
     # runtime_info = await kube_spawner.get_runtime_info(mock_endpoint_orm.endpoint_name)
     # assert runtime_info.total_replicas_nums == 2
 
