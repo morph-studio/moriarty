@@ -30,7 +30,7 @@ class MockSpawner(Spawner):
             unavailable_replicas_nums=0,
         )
 
-    async def scale(self, endpoint_name: str, target_replicas: int) -> None:
+    async def scale(self, endpoint_orm: EndpointORM, target_replicas: int) -> None:
         return None
 
 

@@ -146,5 +146,5 @@ class Spawner:
     async def get_runtime_info(self, endpoint_name: str) -> "EndpointRuntimeInfo":
         raise NotImplementedError
 
-    async def scale(self, endpoint_name: str, target_replicas: int) -> None:
+    async def scale(self, endpoint_orm: "EndpointORM", target_replicas: int) -> None:
         raise NotImplementedError
