@@ -154,21 +154,17 @@ class DeploymentMixin(EnvironmentBuilder):
 
         if endpoint_orm.model_path and endpoint_orm.model_path.startswith("host://"):
             host_path = endpoint_orm.model_path.replace("host:/", "")
-            model_volumn = (
-                client.V1Volume(
-                    name="modeldir",
-                    host_path=client.V1HostPathVolumeSource(
-                        path=host_path,
-                        type="DirectoryOrCreate",
-                    ),
+            model_volumn = client.V1Volume(
+                name="modeldir",
+                host_path=client.V1HostPathVolumeSource(
+                    path=host_path,
+                    type="DirectoryOrCreate",
                 ),
             )
         else:
-            model_volumn = (
-                client.V1Volume(
-                    name="modeldir",
-                    empty_dir=client.V1EmptyDirVolumeSource(),
-                ),
+            model_volumn = client.V1Volume(
+                name="modeldir",
+                empty_dir=client.V1EmptyDirVolumeSource(),
             )
 
         deployment.spec = client.V1DeploymentSpec(
