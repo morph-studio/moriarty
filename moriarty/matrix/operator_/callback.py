@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
@@ -9,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from moriarty.envs import MORIARTY_DISABLE_CALLBACK_LOG_ENV
 from moriarty.log import logger
 from moriarty.matrix.operator_.dbutils import get_db_session, open_db_session
 from moriarty.matrix.operator_.operator_ import Bridger, get_bridger
@@ -28,6 +30,7 @@ def get_callback_consumer(
 class CallbackManager:
     redis_prefix = "moriarty-callback-brq"
     register_function_name = "callback"
+    disable_log = os.getenv(MORIARTY_DISABLE_CALLBACK_LOG_ENV)
 
     def __init__(
         self,
@@ -53,25 +56,23 @@ class CallbackManager:
 
     async def handle_callback(self, payload: str) -> None:
         callback = MatrixCallback.model_validate_json(payload)
-        try:
-            await self._handle_callback(callback)
-        except Exception as e:
-            logger.exception(e)
-            await self.session.rollback()
-            raise
-
-    async def _handle_callback(self, callback: MatrixCallback) -> None:
         await self.bridger.bridge_result(callback)
-        await self.session.execute(
-            update(InferenceLogORM)
-            .where(InferenceLogORM.inference_id == callback.inference_id)
-            .values(
-                status=callback.status,
-                callback_response=callback.model_dump(),
-                finished_at=func.now(),
-            )
-        )
-        await self.session.commit()
+        if not self.disable_log:
+            try:
+                await self.session.execute(
+                    update(InferenceLogORM)
+                    .where(InferenceLogORM.inference_id == callback.inference_id)
+                    .values(
+                        status=callback.status,
+                        callback_response=callback.model_dump(),
+                        finished_at=func.now(),
+                    )
+                )
+                await self.session.commit()
+            except Exception as e:
+                logger.exception(e)
+                await self.session.rollback()
+                raise
         logger.info(f"Callback handled: {callback}")
 
     async def emit_callback(self, callback: MatrixCallback) -> None:
