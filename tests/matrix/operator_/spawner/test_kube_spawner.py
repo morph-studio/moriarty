@@ -26,6 +26,7 @@ def mock_endpoint_orm(session):
     endpoint_name = "mock_endpoint"
     orm = EndpointORM(
         endpoint_name=endpoint_name,
+        model_path="host://tmp/",
     )
     session.add(orm)
     session.commit()

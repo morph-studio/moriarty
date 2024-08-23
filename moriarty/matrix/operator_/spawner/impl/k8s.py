@@ -155,6 +155,21 @@ class DeploymentMixin(EnvironmentBuilder):
             "moriarty.kubespawner.gpu_type": str(endpoint_orm.gpu_type or "").replace("/", "-"),
         }
 
+        if endpoint_orm.model_path and endpoint_orm.model_path.startswith("host://"):
+            host_path = endpoint_orm.model_path.replace("host:/", "")
+            model_volumn = client.V1Volume(
+                name="modeldir",
+                host_path=client.V1HostPathVolumeSource(
+                    path=host_path,
+                    type="DirectoryOrCreate",
+                ),
+            )
+        else:
+            model_volumn = client.V1Volume(
+                name="modeldir",
+                empty_dir=client.V1EmptyDirVolumeSource(),
+            )
+
         deployment.spec = client.V1DeploymentSpec(
             replicas=endpoint_orm.replicas,
             selector=client.V1LabelSelector(
@@ -194,10 +209,7 @@ class DeploymentMixin(EnvironmentBuilder):
                         self._make_compute_contaienr(endpoint_orm),
                     ],
                     volumes=[
-                        client.V1Volume(
-                            name="modeldir",
-                            empty_dir=client.V1EmptyDirVolumeSource(),
-                        ),
+                        model_volumn,
                     ],
                     image_pull_secrets=(
                         [
@@ -247,7 +259,8 @@ class DeploymentMixin(EnvironmentBuilder):
             "/opt/ml/model",
         ]
 
-        if endpoint_orm.model_path:
+        if endpoint_orm.model_path and endpoint_orm.model_path.startswith("s3://"):
+            logger.debug(f"Using s5cmd to copy model from {endpoint_orm.model_path}.")
             command.extend(
                 [
                     "&&",
