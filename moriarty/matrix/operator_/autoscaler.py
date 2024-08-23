@@ -120,7 +120,8 @@ class AutoscalerManager(EndpointMixin, CooldownMixin):
             logger.info(
                 f"Scale endpoint `{endpoint_name}` -> {target_replicas}, based on {metrics}"
             )
-            await self.spawner.scale(endpoint_name, target_replicas)
+            endpoint_orm = await self.get_endpoint_orm(endpoint_name)
+            await self.spawner.scale(endpoint_orm, target_replicas)
         except Exception as e:
             logger.exception(e)
             await self._revoke_scale(endpoint_name)
@@ -133,7 +134,7 @@ class AutoscalerManager(EndpointMixin, CooldownMixin):
         if endpoint_orm is None:
             logger.warning(f"Endpoint not found: {endpoint_name}, may be deleted?")
             return
-        await self.spawner.scale(endpoint_name, endpoint_orm.replicas)
+        await self.spawner.scale(endpoint_orm, endpoint_orm.replicas)
 
     async def _commit_scale(
         self, endpoint_name: str, metrics: EndpointMetrics, target_replicas: int
