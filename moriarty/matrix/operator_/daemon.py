@@ -81,6 +81,7 @@ class DaemonMixin:
         start_latency = random.uniform(0, 5)
         logger.info(f"Wait for latency: {start_latency} to start the daemon...")
         await asyncio.sleep(start_latency)
+        logger.info(f"Start the daemon...")
         await self.run()
         while not await event_wait(self._stop_event, self.interval):
             if self._stop_event.is_set():
