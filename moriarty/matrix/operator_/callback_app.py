@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
 from moriarty.envs import get_bridge_name, get_bridge_result_queue_url, get_spawner_name
+from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge_wrapper import (
     get_bridge_manager,
     get_bridge_wrapper,
@@ -70,6 +71,7 @@ async def callback(
     callback: MatrixCallback,
     cm: CallbackManager = Depends(get_callback_consumer),
 ) -> Response:
+    logger.debug(f"Received callback: {callback}")
     await cm.emit_callback(callback)
     return Response(status_code=200)
 

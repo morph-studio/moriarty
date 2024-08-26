@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import os
+import random
 import signal
 
 import redis.asyncio as redis
@@ -72,10 +73,14 @@ class DaemonMixin:
         try:
             await self.initialize()
         except Exception as e:
-            # Unexpected error, stop the autoscaler
+            # Unexpected error, stop the daemon
             logger.exception(e)
             exit(1)
 
+        # Add a random latency to avoid all daemons running at the same time
+        start_latency = random.uniform(0, 5)
+        logger.info(f"Wait for latency: {start_latency} to start the daemon...")
+        await asyncio.sleep(start_latency)
         await self.run()
         while not await event_wait(self._stop_event, self.interval):
             if self._stop_event.is_set():
