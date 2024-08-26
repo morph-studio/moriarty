@@ -80,8 +80,13 @@ class InferencerConsumer:
                     timeout=self.process_timeout,
                     follow_redirects=True,
                 )
-            except httpx.ConnectError as e:
-                logger.error(f"Invoke endpoint failed: {e}")
+            except httpx.HTTPError as e:
+                logger.error(f"(HTTP FAIL)Invoke endpoint failed: {e}")
+                logger.exception(e)
+                await self._callback(MatrixCallback.from_exception(inference_id, e))
+                return None
+            except Exception as e:
+                logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {e}")
                 logger.exception(e)
                 await self._callback(MatrixCallback.from_exception(inference_id, e))
                 return None
