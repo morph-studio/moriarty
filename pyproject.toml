@@ -9,7 +9,7 @@ keywords = ["moriarty"]
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2",
-    "brq>=0.3.3",
+    "brq>=0.3.6",
     "httpx",
     "loguru",
     "click",
