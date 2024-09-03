@@ -51,7 +51,7 @@ class InferencerConsumer:
         self.invoke_url = urljoin(proxy_url, invoke_path)
         self.health_check_path = urljoin(proxy_url, health_check_path)
         self.callback_url = callbacl_url
-
+        self.endpoint_name = endpoint_name
         self._producer = JobProducer(
             redis=self.redis_client,
             redis_prefix=self.REDIS_PREFIX,
@@ -94,7 +94,7 @@ class InferencerConsumer:
                     logger.error(f"(INTERNAL ERROR)Endpoint is not reachable: {ping_error}")
                     # May container stopping, just re-enqueue and exit
                     await self._producer.invoke(
-                        endpoint_name=self.register_function_name,
+                        endpoint_name=self.endpoint_name,
                         params=payload,
                     )
                     exit(1)
