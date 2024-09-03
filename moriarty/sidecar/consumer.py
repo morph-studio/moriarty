@@ -85,13 +85,13 @@ class InferencerConsumer:
                     timeout=self.process_timeout,
                     follow_redirects=True,
                 )
-            except httpx.HTTPError as e:
-                logger.error(f"(HTTP FAIL)Invoke endpoint failed: {e}")
-                logger.exception(e)
+            except httpx.HTTPError as invoke_error:
+                logger.error(f"(HTTP FAIL)Invoke endpoint failed: {invoke_error}")
+                logger.exception(invoke_error)
                 try:
                     await client.get(self.health_check_path, timeout=60)
-                except httpx.HTTPError as e:
-                    logger.error(f"(INTERNAL ERROR)Endpoint is not reachable: {e}")
+                except httpx.HTTPError as ping_error:
+                    logger.error(f"(INTERNAL ERROR)Endpoint is not reachable: {ping_error}")
                     # May container stopping, just re-enqueue and exit
                     await self._producer.invoke(
                         endpoint_name=self.register_function_name,
@@ -99,12 +99,12 @@ class InferencerConsumer:
                     )
                     exit(1)
                 else:
-                    await self._callback(MatrixCallback.from_exception(inference_id, e))
+                    await self._callback(MatrixCallback.from_exception(inference_id, invoke_error))
                     return None
-            except Exception as e:
-                logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {e}")
-                logger.exception(e)
-                await self._callback(MatrixCallback.from_exception(inference_id, e))
+            except Exception as internal_error:
+                logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {internal_error}")
+                logger.exception(internal_error)
+                await self._callback(MatrixCallback.from_exception(inference_id, internal_error))
                 return None
             else:
                 logger.info(f"Invoke endpoint response status: {response.status_code}")
