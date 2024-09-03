@@ -73,10 +73,24 @@ class InferencerConsumer:
         )
         self.daemon = Daemon(*[self._consumer_builder() for _ in range(concurrency)])
 
+    async def _ping_or_exit(self, payload: dict) -> None:
+        async with httpx.AsyncClient() as client:
+            try:
+                await client.get(self.health_check_path, timeout=60)
+            except httpx.HTTPError as ping_error:
+                logger.error(f"(INTERNAL ERROR)Endpoint is not reachable: {ping_error}")
+                # May container stopping, just re-enqueue and exit
+                await self._producer.invoke(
+                    endpoint_name=self.endpoint_name,
+                    params=payload,
+                )
+                exit(1)
+
     async def _proxy(self, payload: dict) -> dict | None:
         inference_id = payload.get("inference_id") or payload.get("inferenceId")
         if not inference_id:
             return await self.return_no_inference_id_error(payload)
+        await self._ping_or_exit(payload)
         async with httpx.AsyncClient() as client:
             logger.info(f"Invoke endpoint: {self.invoke_url}")
             try:
@@ -89,19 +103,9 @@ class InferencerConsumer:
             except httpx.HTTPError as invoke_error:
                 logger.error(f"(HTTP FAIL)Invoke endpoint failed: {invoke_error}")
                 logger.exception(invoke_error)
-                try:
-                    await client.get(self.health_check_path, timeout=60)
-                except httpx.HTTPError as ping_error:
-                    logger.error(f"(INTERNAL ERROR)Endpoint is not reachable: {ping_error}")
-                    # May container stopping, just re-enqueue and exit
-                    await self._producer.invoke(
-                        endpoint_name=self.endpoint_name,
-                        params=payload,
-                    )
-                    exit(1)
-                else:
-                    await self._callback(MatrixCallback.from_exception(inference_id, invoke_error))
-                    return None
+                await self._ping_or_exit(payload)
+                await self._callback(MatrixCallback.from_exception(inference_id, invoke_error))
+                return None
             except Exception as internal_error:
                 logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {internal_error}")
                 logger.exception(internal_error)
