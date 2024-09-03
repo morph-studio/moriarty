@@ -55,8 +55,7 @@ class InferencerConsumer:
         self.enable_retry = enable_retry
 
         self._producer = JobProducer(
-            redis=self.redis_client,
-            redis_prefix=self.REDIS_PREFIX,
+            redis_client=self.redis_client,
         )
         self._consumer_builder = partial(
             Consumer,
