@@ -84,6 +84,7 @@ class InferencerConsumer:
                     endpoint_name=self.endpoint_name,
                     params=payload,
                 )
+                logger.info(f"Re-enqueue inference job: {payload} and exit")
                 exit(1)
 
     async def _proxy(self, payload: dict) -> dict | None:
