@@ -52,6 +52,8 @@ class InferencerConsumer:
         self.health_check_path = urljoin(proxy_url, health_check_path)
         self.callback_url = callbacl_url
         self.endpoint_name = endpoint_name
+        self.enable_retry = enable_retry
+
         self._producer = JobProducer(
             redis=self.redis_client,
             redis_prefix=self.REDIS_PREFIX,
@@ -60,11 +62,11 @@ class InferencerConsumer:
             Consumer,
             self.redis_client,
             self._proxy,
-            register_function_name=endpoint_name,
+            register_function_name=self.endpoint_name,
             redis_prefix=self.REDIS_PREFIX,
             group_name=self.GROUP_NAME,
             enable_enque_deferred_job=False,  # No deferred job for inferencer
-            enable_reprocess_timeout_job=enable_retry,
+            enable_reprocess_timeout_job=self.enable_retry,
             enable_dead_queue=False,
             process_timeout=self.process_timeout,
             delete_message_after_process=True,
