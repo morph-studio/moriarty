@@ -10,6 +10,7 @@ from brq.daemon import Daemon
 
 from moriarty.log import logger
 from moriarty.sidecar.params import InferenceProxyStatus, MatrixCallback
+from moriarty.sidecar.producer import JobProducer
 
 if sys.version_info >= (3, 11):
     import asyncio as async_timeout
@@ -50,16 +51,21 @@ class InferencerConsumer:
         self.invoke_url = urljoin(proxy_url, invoke_path)
         self.health_check_path = urljoin(proxy_url, health_check_path)
         self.callback_url = callbacl_url
+        self.endpoint_name = endpoint_name
+        self.enable_retry = enable_retry
 
+        self._producer = JobProducer(
+            redis_client=self.redis_client,
+        )
         self._consumer_builder = partial(
             Consumer,
             self.redis_client,
             self._proxy,
-            register_function_name=endpoint_name,
+            register_function_name=self.endpoint_name,
             redis_prefix=self.REDIS_PREFIX,
             group_name=self.GROUP_NAME,
             enable_enque_deferred_job=False,  # No deferred job for inferencer
-            enable_reprocess_timeout_job=enable_retry,
+            enable_reprocess_timeout_job=self.enable_retry,
             enable_dead_queue=False,
             process_timeout=self.process_timeout,
             delete_message_after_process=True,
@@ -67,10 +73,25 @@ class InferencerConsumer:
         )
         self.daemon = Daemon(*[self._consumer_builder() for _ in range(concurrency)])
 
+    async def _ping_or_exit(self, payload: dict) -> None:
+        async with httpx.AsyncClient() as client:
+            try:
+                await client.get(self.health_check_path, timeout=60)
+            except httpx.HTTPError as ping_error:
+                logger.error(f"(INTERNAL ERROR)Endpoint is not reachable: {ping_error}")
+                # May container stopping, just re-enqueue and exit
+                await self._producer.invoke(
+                    endpoint_name=self.endpoint_name,
+                    params=payload,
+                )
+                logger.info(f"Re-enqueue inference job: {payload} and exit")
+                exit(1)
+
     async def _proxy(self, payload: dict) -> dict | None:
         inference_id = payload.get("inference_id") or payload.get("inferenceId")
         if not inference_id:
             return await self.return_no_inference_id_error(payload)
+        await self._ping_or_exit(payload)
         async with httpx.AsyncClient() as client:
             logger.info(f"Invoke endpoint: {self.invoke_url}")
             try:
@@ -80,15 +101,16 @@ class InferencerConsumer:
                     timeout=self.process_timeout,
                     follow_redirects=True,
                 )
-            except httpx.HTTPError as e:
-                logger.error(f"(HTTP FAIL)Invoke endpoint failed: {e}")
-                logger.exception(e)
-                await self._callback(MatrixCallback.from_exception(inference_id, e))
+            except httpx.HTTPError as invoke_error:
+                logger.error(f"(HTTP FAIL)Invoke endpoint failed: {invoke_error}")
+                logger.exception(invoke_error)
+                await self._ping_or_exit(payload)
+                await self._callback(MatrixCallback.from_exception(inference_id, invoke_error))
                 return None
-            except Exception as e:
-                logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {e}")
-                logger.exception(e)
-                await self._callback(MatrixCallback.from_exception(inference_id, e))
+            except Exception as internal_error:
+                logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {internal_error}")
+                logger.exception(internal_error)
+                await self._callback(MatrixCallback.from_exception(inference_id, internal_error))
                 return None
             else:
                 logger.info(f"Invoke endpoint response status: {response.status_code}")
