@@ -72,7 +72,7 @@ class InferencerConsumer:
         )
         self.daemon = Daemon(*[self._consumer_builder() for _ in range(concurrency)])
 
-    async def _proxy(self, payload: dict, retry_count: int = 0) -> dict | None:
+    async def _proxy(self, payload: dict) -> dict | None:
         inference_id = payload.get("inference_id") or payload.get("inferenceId")
         if not inference_id:
             return await self.return_no_inference_id_error(payload)
@@ -98,11 +98,9 @@ class InferencerConsumer:
                         params=payload,
                     )
                     exit(1)
-                if retry_count >= 3:
+                else:
                     await self._callback(MatrixCallback.from_exception(inference_id, e))
                     return None
-                else:
-                    return await self._proxy(payload, retry_count + 1)
             except Exception as e:
                 logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {e}")
                 logger.exception(e)
