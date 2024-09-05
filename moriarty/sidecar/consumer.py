@@ -104,7 +104,6 @@ class InferencerConsumer:
             except httpx.HTTPError as invoke_error:
                 logger.error(f"(HTTP FAIL)Invoke endpoint failed: {invoke_error}")
                 logger.exception(invoke_error)
-                await self._ping_or_exit(payload)
                 await self._callback(MatrixCallback.from_exception(inference_id, invoke_error))
                 return None
             except Exception as internal_error:
