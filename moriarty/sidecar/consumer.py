@@ -92,7 +92,7 @@ class InferencerConsumer:
         inference_id = payload.get("inference_id") or payload.get("inferenceId")
         if not inference_id:
             return await self.return_no_inference_id_error(payload)
-        await self._ping_or_exit(payload, reenqueue=False)
+        await self._ping_or_exit(payload, reenqueue=True)
         async with httpx.AsyncClient() as client:
             logger.info(f"Invoke endpoint: {self.invoke_url}")
             try:
