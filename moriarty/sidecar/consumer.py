@@ -105,6 +105,7 @@ class InferencerConsumer:
                 logger.error(f"(HTTP FAIL)Invoke endpoint failed: {invoke_error}")
                 logger.exception(invoke_error)
                 await self._callback(MatrixCallback.from_exception(inference_id, invoke_error))
+                await self._ping_or_exit()  # If server is down, restart sidecar and do init again
                 return None
             except Exception as internal_error:
                 logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {internal_error}")
