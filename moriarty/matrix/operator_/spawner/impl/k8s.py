@@ -30,6 +30,7 @@ class DeploymentMixin(EnvironmentBuilder):
     init_image = os.getenv("INIT_IMAGE", "peakcom/s5cmd")
     sidecar_image = os.getenv("SIDECAR_IMAGE", "wh1isper/moriarty-sidecar")
     image_pull_secrets = os.getenv("IMAGE_PULL_SECRETS")
+    pull_policy = os.getenv("PULL_POLICY", "Always")
     S5_NUMWORKS = int(os.getenv("S5_NUMWORKERS", 3))
     S5_CONCURRENCY = int(os.getenv("S5_CONCURRENCY", 1))
 
@@ -326,6 +327,7 @@ class DeploymentMixin(EnvironmentBuilder):
                 client.V1EnvVar(name=k, value=v)
                 for k, v in self.build_sidecar_environment(endpoint_orm).items()
             ],
+            image_pull_policy=self.pull_policy,
         )
 
     def _make_compute_contaienr(
@@ -396,6 +398,7 @@ class DeploymentMixin(EnvironmentBuilder):
                     mount_path="/opt/ml/model",
                 ),
             ],
+            image_pull_policy=self.pull_policy,
         )
 
 
