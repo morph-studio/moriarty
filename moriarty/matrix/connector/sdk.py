@@ -41,14 +41,23 @@ async def invoke(
         created_at=created_at or datetime.now(),
         expires_at=expires_at,
     )
-    async with async_client(
-        follow_redirects=True,
-        transport=httpx.AsyncHTTPTransport(retries=5),
-    ) as client:
-        logger.debug(f"Invoke endpoint: {url} with payload: {payload}")
-        return await client.post(
-            url,
-            data=payload.model_dump_json(),
-            timeout=60,
-            **client_kwargs,
-        )
+    if isinstance(async_client, httpx.AsyncClient):
+        async with async_client(
+            follow_redirects=True, transport=httpx.AsyncHTTPTransport(retries=5)
+        ) as client:
+            logger.debug(f"Invoke endpoint: {url} with payload: {payload}")
+            return await client.post(
+                url,
+                data=payload.model_dump_json(),
+                timeout=60,
+                **client_kwargs,
+            )
+    else:
+        async with async_client() as client:
+            logger.debug(f"Invoke endpoint: {url} with payload: {payload}")
+            return await client.post(
+                url,
+                data=payload.model_dump_json(),
+                timeout=60,
+                **client_kwargs,
+            )
