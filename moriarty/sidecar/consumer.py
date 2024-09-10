@@ -33,7 +33,7 @@ class InferencerConsumer:
         invoke_path: str = "/invocations",
         health_check_path: str = "/ping",
         callbacl_url: str = "http://moriarty-operator-callback:8999/callback",
-        enable_retry: bool = True,
+        enable_retry: bool = False,
         enable_ssl: bool = False,
         concurrency: int = 1,
         process_timeout: int = 3600,
@@ -88,11 +88,39 @@ class InferencerConsumer:
                     logger.info(f"Re-enqueue inference job: {payload} and exit")
                 exit(1)
 
+    async def _can_ping(self) -> bool:
+        async with httpx.AsyncClient() as client:
+            try:
+                await client.get(self.health_check_path, timeout=60)
+                return True
+            except httpx.HTTPError:
+                return False
+
+    async def reenqueue_and_wait_restart(self, payload: dict) -> None:
+        await self._producer.invoke(
+            endpoint_name=self.endpoint_name,
+            params=payload,
+        )
+        logger.info(f"Re-enqueue inference job: {payload}")
+        await self.wait_for_restrat()
+
+    async def wait_for_restrat(self) -> None:
+        try:
+            async with async_timeout.timeout(self.health_check_timeout):
+                logger.info(
+                    f"Wait for invoke endpoint online...timeout: {self.health_check_timeout}s"
+                )
+                await self.wait_for_health_check()
+        except TimeoutError:
+            logger.error(f"Invoke endpoint not online in {self.health_check_timeout}s. Exit...")
+            exit(1)
+
     async def _proxy(self, payload: dict) -> dict | None:
         inference_id = payload.get("inference_id") or payload.get("inferenceId")
         if not inference_id:
             return await self.return_no_inference_id_error(payload)
-        await self._ping_or_exit(payload, reenqueue=True)
+        if not await self._can_ping():
+            return await self.reenqueue_and_wait_restart(payload)
         async with httpx.AsyncClient() as client:
             logger.info(f"Invoke endpoint: {self.invoke_url}")
             try:
@@ -102,13 +130,25 @@ class InferencerConsumer:
                     timeout=self.process_timeout,
                     follow_redirects=True,
                 )
+            except httpx.RemoteProtocolError as remote_crash_error:
+                """
+                A crash error should not be retried
+                """
+                logger.error(f"(Maybe Crashed)Invoke endpoint failed: {remote_crash_error}")
+                logger.exception(remote_crash_error)
+                await self._callback(
+                    MatrixCallback.from_exception(inference_id, remote_crash_error)
+                )
+                await self.wait_for_restrat()
+                return None
             except httpx.HTTPError as invoke_error:
+                """
+                The connection error? Retry it
+                """
                 logger.error(f"(HTTP FAIL)Invoke endpoint failed: {invoke_error}")
                 logger.exception(invoke_error)
                 await self._callback(MatrixCallback.from_exception(inference_id, invoke_error))
-                await self._ping_or_exit(
-                    payload, reenqueue=False
-                )  # If server is down, restart sidecar and do init again
+                await self.reenqueue_and_wait_restart(payload)
                 return None
             except Exception as internal_error:
                 logger.error(f"(INTERNAL ERROR)Invoke endpoint failed: {internal_error}")
@@ -158,6 +198,9 @@ class InferencerConsumer:
     async def wait_for_health_check(self) -> None:
         async with httpx.AsyncClient() as client:
             while True:
+                if any(consumer._stop_event.is_set() for consumer in self.daemon.runnables):
+                    logger.info("Stop event is set. Exit...")
+                    exit(0)
                 try:
                     await client.get(self.health_check_path, timeout=60)
                     logger.info(f"Ping {self.health_check_path} succeeded")
