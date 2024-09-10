@@ -43,6 +43,7 @@ async def invoke(
     )
     async with async_client(
         follow_redirects=True,
+        transport=httpx.AsyncHTTPTransport(retries=5),
     ) as client:
         logger.debug(f"Invoke endpoint: {url} with payload: {payload}")
         return await client.post(
