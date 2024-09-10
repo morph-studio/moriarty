@@ -169,7 +169,9 @@ class InferencerConsumer:
         )
 
     async def _callback(self, callback_params: MatrixCallback) -> None:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            follow_redirects=True, transport=httpx.AsyncHTTPTransport(retries=5)
+        ) as client:
             try:
                 logger.info(f"Callback for finished inference: {self.callback_url}")
                 await client.post(
