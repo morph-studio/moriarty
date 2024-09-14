@@ -157,7 +157,7 @@ class Bridger(EndpointMixin, AutoscaleMixin):
             self.session.add(log_orm)
             logger.debug(f"Inference job logged: {job}")
 
-        logger.info(f"Bridge endpoint: {endpoint_name}")
+        logger.debug(f"Bridge endpoint: {endpoint_name}")
         while await self.has_capacity(endpoint_name):
             logger.debug(f"{endpoint_name} has capacity, try to sample job")
             sampled_count = await self.bridge_wrapper.sample_job(
@@ -167,7 +167,7 @@ class Bridger(EndpointMixin, AutoscaleMixin):
             )
             if not sampled_count:
                 return
-            logger.debug(f"{sampled_count} job sampled -> {endpoint_name}")
+            logger.info(f"{sampled_count} job sampled -> {endpoint_name}")
 
     async def bridge_result(self, callback: MatrixCallback) -> None:
         await self.bridge_wrapper.enqueue_result(
