@@ -105,7 +105,12 @@ class EnvironmentBuilder:
         }
 
     def build_compute_environment(self, endpoint_orm: "EndpointORM") -> dict[str, str]:
+        nvidia_visible_devices = {}
+        if not endpoint_orm.gpu_nums:
+            nvidia_visible_devices["CUDA_VISIBLE_DEVICES"] = "-1"
+
         return {
+            **nvidia_visible_devices,
             **{str(k): str(v) for k, v in endpoint_orm.environment_variables.items()},
         }
 
