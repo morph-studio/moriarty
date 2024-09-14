@@ -142,7 +142,7 @@ class KubeAutoscalerDaemon(DaemonMixin):
 
 
 class BridgeDaemon(DaemonMixin):
-    interval = float(os.getenv(MORIARTY_BRIDGE_INTERVAL_ENV, 1))
+    interval = float(os.getenv(MORIARTY_BRIDGE_INTERVAL_ENV, 60))
 
     def __init__(self, config: Config) -> None:
         super().__init__()
