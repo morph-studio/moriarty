@@ -59,3 +59,11 @@ def parse_s3_path(s3_path: str):
     """
     bucket_name, object_name = s3_path.replace("s3://", "").split("/", 1)
     return bucket_name, object_name
+
+
+def parse_gcs_path(gcs_path: str):
+    """
+    e.g. gs://bucket/blob
+    """
+    bucket_name, blob_name = gcs_path.replace("gs://", "").split("/", 1)
+    return bucket_name, blob_name
