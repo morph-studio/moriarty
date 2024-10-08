@@ -26,9 +26,14 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-matrix = ["moriarty[service]", "moriarty[sqs]"]
+matrix = ["moriarty[service]", "moriarty[sqs]", "moriarty[pubsub]"]
 
 sqs = ["boto3"]
+pubsub = [
+    "google-api-core",
+    "google-cloud-pubsub>=2.0.0",
+    "google-cloud-storage",
+]
 service = [
     "psycopg2-binary",
     "sqlalchemy[asyncio]",
