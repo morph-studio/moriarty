@@ -85,12 +85,12 @@ class PubSubBridge(QueueBridge):
 
     def _get_topic_path(self, endpoint_name: str = None, priority: int = None) -> str:
         priority = priority or 100
-        topic_id = self._get_topic_prefix(endpoint_name)
+        topic_id = f"{self._get_topic_prefix(endpoint_name)}-{priority}"
         return self.publisher_client.topic_path(self.project_id, topic_id)
 
     def _get_subscription_path(self, endpoint_name: str = None, priority: int = None) -> str:
         priority = priority or 100
-        subscription_id = self._get_subscription_prefix(endpoint_name)
+        subscription_id = f"{self._get_subscription_prefix(endpoint_name)}-{priority}"
         return self.subscriber_client.subscription_path(self.project_id, subscription_id)
 
     @cache
@@ -133,6 +133,56 @@ class PubSubBridge(QueueBridge):
         except NotFound:
             logger.info(f"Topic not found (already deleted): {topic_path}")
 
+    async def list_available_priorities(self, endpoint_name: str) -> list[int]:
+        def _():
+            priorities = []
+            topic_prefix = self._get_topic_prefix(endpoint_name)
+            try:
+                # List all topics in the project
+                project_path = f"projects/{self.project_id}"
+                topics = self.publisher_client.list_topics(request={"project": project_path})
+                
+                for topic in topics:
+                    topic_name = topic.name.split('/')[-1]
+                    if topic_name.startswith(topic_prefix):
+                        # Extract priority from topic name
+                        try:
+                            priority_str = topic_name.split('-')[-1]
+                            priority = int(priority_str)
+                        except ValueError:
+                            logger.warning(f"Invalid priority format in topic name: {topic_name}")
+                            continue
+
+                        # Construct corresponding subscription path
+                        subscription_id = f"moriarty-bridge-{endpoint_name}-sub-{priority}"
+                        subscription_path = self.subscriber_client.subscription_path(
+                            self.project_id, subscription_id
+                        )
+
+                        try:
+                            # Attempt to pull a single message to check for pending messages
+                            response = self.subscriber_client.pull(
+                                request={
+                                    "subscription": subscription_path,
+                                    "max_messages": 1,
+                                }
+                            )
+                            if response.received_messages:
+                                priorities.append(priority)
+                        except NotFound:
+                            logger.warning(f"Subscription not found: {subscription_path}")
+                            continue
+                        except GoogleAPICallError as e:
+                            logger.error(f"Error pulling messages from {subscription_path}: {e}")
+                            continue
+
+                return sorted(priorities)
+            except GoogleAPICallError as e:
+                logger.error(f"Error listing topics: {e}")
+                return priorities
+
+        return await asyncio.to_thread(_)
+
     async def publish_job(self, endpoint_name: str, job: InferenceJob, priority: int = None) -> str:
         topic_path = self._ensure_topic(self._get_topic_path(endpoint_name, priority))
 
@@ -149,6 +199,7 @@ class PubSubBridge(QueueBridge):
         priority: int = None,
         size: int = None,
     ) -> int:
+        size = size or 1
         subscription_path = self._ensure_subscription(
             topic_path=self._get_topic_path(endpoint_name, priority),
             subscription_path=self._get_subscription_path(endpoint_name, priority),
@@ -304,6 +355,7 @@ class PubSubBridge(QueueBridge):
 
         tasks = []
         processed_count = 0
+        invalid_ack_ids = []
 
         for received_message in received_messages:
             ack_id = received_message.ack_id
@@ -311,23 +363,45 @@ class PubSubBridge(QueueBridge):
             try:
                 message_data = json.loads(message.data.decode("utf-8"))
 
-                try:
-                    payload = base64.b64decode(message["responseBody"]["content"]).decode("utf-8")
-                except Exception as e:
-                    logger.info(f"Cannot parse inference result {message_data["inferenceId"]}, fetching from GCS.")
-                    output_location = message_data["responseParameters"].get("outputLocation")
-                    logger.info(f"output_location: {output_location}")
-                    payload = await self._get_gcs_content(output_location)
+                if "eventName" in message_data and message_data["eventName"] != "InferenceResult":
+                    logger.warning(f"Unexpected message {message_data}. Message will be ignored.")
+                    invalid_ack_ids.append(ack_id)
+                    continue
 
-                result = InferenceResult(
-                    inference_id = message_data["inferenceId"],
-                    status=InferenceResultStatus.COMPLETED if message_data["invocationStatus"] == "Completed" else InferenceResultStatus.FAILED,
-                    message=message_data["responseBody"]["message"],
-                    # payload=base64.b64decode(message_data["responseBody"]["content"]).decode("utf-8"),
-                    # payload=message_data["responseBody"]["content"],
-                    payload=payload,
-                )
-                logger.debug(f"Prepared InferenceResult for inference ID: {result.inference_id}")
+                if "invocationStatus" in message_data and message_data["invocationStatus"] == "Failed":
+                    result = InferenceResult(
+                        inference_id=message_data["inferenceId"],
+                        status=InferenceResultStatus.FAILED,
+                        message=message_data["responseBody"]["message"],
+                        payload=message_data["responseBody"]["content"],
+                    )
+                else:
+                    try:
+                        payload = base64.b64decode(message_data["responseBody"]["content"]).decode("utf-8")
+                        # payload = message["responseBody"]["content"]
+                    except Exception as e:
+                        logger.info(f"Cannot parse inference result {message_data['inferenceId']}, fetching from GCS.")
+                        output_location = message_data["responseParameters"].get("outputLocation")
+                        if not output_location:
+                            logger.error(
+                                f"Neither response body parsed nor output location, can't handle now: {message_data}"
+                            )
+                            logger.exception(e)
+                            invalid_ack_ids.append(ack_id)
+                            continue
+
+                        logger.info(f"output_location: {output_location}")
+                        payload = await self._get_gcs_content(output_location)
+
+                    result = InferenceResult(
+                        inference_id = message_data["inferenceId"],
+                        status=InferenceResultStatus.COMPLETED if message_data["invocationStatus"] == "Completed" else InferenceResultStatus.FAILED,
+                        message=message_data["responseBody"]["message"],
+                        # payload=base64.b64decode(message_data["responseBody"]["content"]).decode("utf-8"),
+                        # payload=message_data["responseBody"]["content"],
+                        payload=payload,
+                    )
+                    logger.debug(f"Prepared InferenceResult for inference ID: {result.inference_id}")
             except Exception as e:
                 logger.error(f"Error parsing message {message_data}: {e}")
                 continue
@@ -342,6 +416,16 @@ class PubSubBridge(QueueBridge):
                 )
             )
             tasks.append(task)
+
+        if invalid_ack_ids:
+            await run_in_threadpool(
+                self.subscriber_client.acknowledge,
+                request={
+                    "subscription": subscription_path,
+                    "ack_ids": invalid_ack_ids,
+                }
+            )
+            logger.info(f"Acknowledged {len(invalid_ack_ids)} invalid messages")
 
         if tasks:
             await asyncio.gather(*tasks)
@@ -358,13 +442,8 @@ class PubSubBridge(QueueBridge):
         additional_seconds: int=120,
     ):
         try:
-            if "invocationStatus" in result and result.status == InferenceResultStatus.FAILED:
-                logger.debug(f"Inference ID {result.inference_id} failed with message: {result.message}")
-            elif "eventName" in result and result.eventName != "InferenceResult":
-                logger.warning(f"Unexpected message {result}. Message will be ignored.")
-            else:
-                await process_func(result)
-                logger.info(f"Processed message ID: {result.inference_id}")
+            await process_func(result)
+            logger.info(f"Processed message ID: {result.inference_id}")
 
             # Acknowledge the message after successful processing
             await run_in_threadpool(
