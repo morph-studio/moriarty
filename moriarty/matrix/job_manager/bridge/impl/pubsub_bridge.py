@@ -51,7 +51,6 @@ class PubSubBridge(QueueBridge):
         self,
         bridge_result_topic: str = None,
         project_id: str = None,
-        output_bucket: str = None,
         *args,
         **kwargs,
     ):
@@ -59,7 +58,6 @@ class PubSubBridge(QueueBridge):
 
         self.publisher_client = pubsub_v1.PublisherClient()
         self.subscriber_client = pubsub_v1.SubscriberClient()
-        self.output_bucket = output_bucket
 
         if not bridge_result_topic:
             raise ValueError("Bridge result topic must be provided.")
