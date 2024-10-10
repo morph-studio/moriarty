@@ -80,8 +80,8 @@ class PubSubBridge(QueueBridge):
     def _get_topic_prefix(self, endpoint_name: str) -> str:
         return f"moriarty-bridge-{endpoint_name}"
 
-    def _get_subscription_prefix(self, endpoint_name: str) -> str:
-        return f"moriarty-bridge-{endpoint_name}-sub"
+    def _get_subscription_prefix(self, topic_id: str) -> str:
+        return f"{topic_id}-sub"
 
     def _get_topic_path(self, endpoint_name: str = None, priority: int = None) -> str:
         priority = priority or 100
@@ -90,9 +90,14 @@ class PubSubBridge(QueueBridge):
 
     def _get_subscription_path(self, endpoint_name: str = None, priority: int = None) -> str:
         priority = priority or 100
-        subscription_id = f"{self._get_subscription_prefix(endpoint_name)}-{priority}"
+        topic_id = f"{self._get_topic_prefix(endpoint_name)}-{priority}"
+        subscription_id = self._get_subscription_prefix(topic_id)
         return self.subscriber_client.subscription_path(self.project_id, subscription_id)
-
+    
+    def make_queue_name(self, endpoint_name: str, priority: int = None) -> str:
+        priority = priority or 100
+        return self._get_topic_path(endpoint_name, priority)
+    
     @cache
     def _ensure_topic(self, topic_path: str = None) -> str:
         try:
@@ -118,6 +123,9 @@ class PubSubBridge(QueueBridge):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
         return subscription_path
+    
+    def make_job_queue_url(self, endpoint_name: str, priority: int = None) -> str:
+        return self._ensure_topic(self.make_queue_name(endpoint_name, priority))
 
     def _delete_subscription(self, subscription_path: str):
         try:
@@ -133,7 +141,19 @@ class PubSubBridge(QueueBridge):
         except NotFound:
             logger.info(f"Topic not found (already deleted): {topic_path}")
 
-    async def list_available_priorities(self, endpoint_name: str) -> list[int]:
+    def remove_job_queue(self, endpoint_name: str, priority: int = None) -> None:
+        topic_path = self._get_topic_path(endpoint_name, priority)
+        try:
+            project_id, topic_id = self._parse_topic_path(topic_path)
+            subscription_id = self._get_subscription_prefix(topic_id)
+            subscription_path = self.subscriber_client.subscription_path(project_id, subscription_id)
+            self._delete_subscription(subscription_path)
+            logger.info(f"deleted associated subscription_path {subscription_path}")
+        except Exception as e:
+            logger.info(f"Error {e} while removing subscription path {subscription_path}")
+        self._delete_topic(self._get_topic_path(endpoint_name, priority))
+
+    async def list_avaliable_priorities(self, endpoint_name: str) -> list[int]:
         def _():
             priorities = []
             topic_prefix = self._get_topic_prefix(endpoint_name)
@@ -183,7 +203,7 @@ class PubSubBridge(QueueBridge):
 
         return await asyncio.to_thread(_)
 
-    async def publish_job(self, endpoint_name: str, job: InferenceJob, priority: int = None) -> str:
+    async def enqueue_job(self, endpoint_name: str, job: InferenceJob, priority: int = None) -> str:
         topic_path = self._ensure_topic(self._get_topic_path(endpoint_name, priority))
 
         data = job.model_dump_json().encode("utf-8")
@@ -192,12 +212,12 @@ class PubSubBridge(QueueBridge):
         logger.debug(f"Job {job.inference_id} published with message ID {message_id}")
         return job.inference_id
 
-    async def subscribe_job(
+    async def dequeue_job(
         self,
         endpoint_name: str,
         process_func: Awaitable[InferenceJob],
-        priority: int = None,
         size: int = None,
+        priority: int = None,
     ) -> int:
         size = size or 1
         subscription_path = self._ensure_subscription(
@@ -264,7 +284,7 @@ class PubSubBridge(QueueBridge):
 
         return processed_count
 
-    async def publish_result(self, result: InferenceResult) -> str:
+    async def enqueue_result(self, result: InferenceResult) -> str:
         invocation_status = (
             "Completed" if result.status == InferenceResultStatus.COMPLETED else "Failed"
         )
@@ -320,7 +340,7 @@ class PubSubBridge(QueueBridge):
 
         return result.inference_id
 
-    async def subscribe_result(self, process_func: Awaitable[InferenceResult], size: int = 10) -> int:
+    async def dequeue_result(self, process_func: Awaitable[InferenceResult], size: int = 10) -> int:
         subscription_path = self._ensure_subscription(
             topic_path=self.bridge_result_topic_path,
             subscription_path=self.bridge_result_subscription_path,
@@ -476,6 +496,17 @@ class PubSubBridge(QueueBridge):
             except Exception as ex:
                 logger.error(f"Unexpected error when extending ack deadline for ack_id {ack_id}: {ex}")
 
+    def _parse_topic_path(topic_path):
+        parts = topic_path.split('/')
+        if len(parts) != 4 or parts[0] != 'projects' or parts[2] != 'topics':
+            raise ValueError("Invalid topic path format")
+        return parts[1], parts[3]
+
+    def _parse_subscription_path(subscription_path):
+        parts = subscription_path.split('/')
+        if len(parts) != 4 or parts[0] != 'projects' or parts[2] != 'subscriptions':
+            raise ValueError("Invalid subscription path format")
+        return parts[1], parts[3]
 
     async def _upload_to_gcs(self, payload: str) -> str:
         storage_client = storage.Client()

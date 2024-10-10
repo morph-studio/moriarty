@@ -75,11 +75,7 @@ def pubsub_bridge(case_id, endpoint_name, priority, project_id):
         bridge_result_topic=result_topic_name,
         project_id=project_id,
     )
-    job_topic_path = bridge._ensure_topic(bridge._get_topic_path(endpoint_name, priority))
-    job_subscription_path = bridge._ensure_subscription(
-        topic_path=job_topic_path,
-        subscription_path=bridge._get_subscription_path(endpoint_name, priority),
-    )
+    bridge.make_job_queue_url = lambda endpoint_name, priority: job_topic_path
     yield bridge
     
     try:
@@ -99,7 +95,7 @@ async def test_bridge_job(pubsub_bridge: PubSubBridge):
         inference_id="test-inference-id",
         payload={"input": "test"},
     )
-    inference_id = await pubsub_bridge.publish_job("test", input_job)
+    inference_id = await pubsub_bridge.enqueue_job("test", input_job)
 
     assert inference_id
 
@@ -108,7 +104,7 @@ async def test_bridge_job(pubsub_bridge: PubSubBridge):
         _called = True
         assert inference_id == "test-inference-id"
 
-    await pubsub_bridge.subscribe_job("test", _process_func)
+    await pubsub_bridge.dequeue_job("test", _process_func)
 
     assert _called
 
@@ -138,19 +134,19 @@ async def test_bridge_result(
 ):
     _called = False
 
-    await pubsub_bridge.publish_result(inference_result)
+    await pubsub_bridge.enqueue_result(inference_result)
 
     async def _process_func(result: InferenceResult):
         nonlocal _called
         _called = True
         assert result == inference_result
 
-    await pubsub_bridge.list_available_priorities(endpoint_name) == [priority]
-    await pubsub_bridge.subscribe_result(_process_func)
+    await pubsub_bridge.list_avaliable_priorities(endpoint_name) == [priority]
+    await pubsub_bridge.dequeue_result(_process_func)
 
     assert _called
 
-    await pubsub_bridge.list_available_priorities(endpoint_name) == []
+    await pubsub_bridge.list_avaliable_priorities(endpoint_name) == []
 
 
 @pytest.fixture
@@ -194,16 +190,16 @@ async def test_bridge_big_result(
 
     _called = False
 
-    await pubsub_bridge.publish_result(inference_result)
+    await pubsub_bridge.enqueue_result(inference_result)
 
     async def _process_func(result: InferenceResult):
         nonlocal _called
         _called = True
         assert result == inference_result
 
-    await pubsub_bridge.list_available_priorities(endpoint_name) == [priority]
-    await pubsub_bridge.subscribe_result(_process_func)
+    await pubsub_bridge.list_avaliable_priorities(endpoint_name) == [priority]
+    await pubsub_bridge.dequeue_result(_process_func)
 
     assert _called
 
-    await pubsub_bridge.list_available_priorities(endpoint_name) == []
+    await pubsub_bridge.list_avaliable_priorities(endpoint_name) == []
