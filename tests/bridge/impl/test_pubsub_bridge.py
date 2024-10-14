@@ -40,8 +40,8 @@ def pubsub_bridge(case_id, endpoint_name, priority, project_id):
         subscriber = pubsub_v1.SubscriberClient()
     except ImportError:
         pytest.skip("google-cloud-pubsub is not installed")
-    except Exception:
-        pytest.skip("pubsub_v1 is not configured")
+    except Exception as e:
+        pytest.skip(f"pubsub_v1 is not configured with error: {e}")
 
     try:
         from google.api_core.exceptions import AlreadyExists, NotFound
@@ -68,8 +68,8 @@ def pubsub_bridge(case_id, endpoint_name, priority, project_id):
 
     except AlreadyExists:
         pass
-    except Exception:
-        pytest.skip("pubsub_v1 is not configured")
+    except Exception as e:
+        pytest.skip(f"pubsub_v1 is not configured with error: {e}")
 
     bridge = PubSubBridge(
         bridge_result_topic=result_topic_name,
