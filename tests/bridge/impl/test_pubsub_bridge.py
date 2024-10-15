@@ -29,7 +29,7 @@ def gcp_credentials():
 
 @pytest.fixture(scope="session")
 def project_id():
-    return "plasma-cascade-431107-u4"
+    return "storage-transfer-dev-436409"
 
 @pytest.fixture
 def pubsub_bridge(case_id, endpoint_name, priority, project_id):
@@ -160,7 +160,7 @@ def result_bucket(pubsub_bridge: PubSubBridge,):
     except Exception:
         pytest.skip("storage is not configured")
 
-    bucket_name = "morph-pubsub"
+    bucket_name = "dev-cameraready"
     try:
         # Check if bucket exists
         bucket = client.bucket(bucket_name)

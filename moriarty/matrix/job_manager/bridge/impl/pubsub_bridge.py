@@ -102,8 +102,8 @@ class PubSubBridge(QueueBridge):
             self.publisher_client.get_topic(request={"topic": topic_path})
             logger.info(f"Topic already exists: {topic_path}")
         except NotFound:
-            self.publisher_client.create_topic(request={"name": topic_path})
-            logger.info(f"Created topic: {topic_path}")
+            topic = self.publisher_client.create_topic(request={"name": topic_path})
+            logger.info(f"Created topic: {topic.name}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
         return topic_path
@@ -114,10 +114,8 @@ class PubSubBridge(QueueBridge):
             self.subscriber_client.get_subscription(request={"subscription": subscription_path})
             logger.info(f"Subscription already exists: {subscription_path}")
         except NotFound:
-            self.subscriber_client.create_subscription(
-                request={"name": subscription_path, "topic": topic_path}
-            )
-            logger.info(f"Created subscription: {subscription_path}")
+            subscription = self.subscriber_client.create_subscription(request={"name": subscription_path, "topic": topic_path})
+            logger.info(f"Created subscription: {subscription.name}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
         return subscription_path
@@ -222,7 +220,7 @@ class PubSubBridge(QueueBridge):
             topic_path=self._get_topic_path(endpoint_name, priority),
             subscription_path=self._get_subscription_path(endpoint_name, priority),
         )
-        logger.debug(f"Polling job from subscription: {subscription_path}")
+        logger.info(f"Polling job from subscription: {subscription_path}")
         try:
             return await self._pull_messages_and_execute(process_func, subscription_path, size)
         except Exception as e:
