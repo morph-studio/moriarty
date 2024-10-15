@@ -149,21 +149,43 @@ async def test_bridge_result(
     await pubsub_bridge.list_avaliable_priorities(endpoint_name) == []
 
 
+# @pytest.fixture
+# def result_bucket(pubsub_bridge: PubSubBridge,):
+#     try:
+#         from google.cloud import storage
+
+#         client = storage.Client()
+#     except ImportError:
+#         pytest.skip("google-cloud-storage is not installed")
+#     except Exception:
+#         pytest.skip("storage is not configured")
+
+#     bucket_name = "dev-cameraready"
+#     try:
+#         # Check if bucket exists
+#         bucket = client.bucket(bucket_name)
+#     except Exception as e:
+#         pytest.skip(f"Bucket not found {e}")
+#     # monkeypatch.setattr(PubSubBridge(), "output_bucket", bucket_name)
+#     pubsub_bridge.output_bucket = bucket_name
+#     yield bucket_name
+
+
 @pytest.fixture
 def result_bucket(pubsub_bridge: PubSubBridge,):
     try:
-        from google.cloud import storage
+        import boto3
 
-        client = storage.Client()
+        s3_client = boto3.client("s3")
     except ImportError:
-        pytest.skip("google-cloud-storage is not installed")
-    except Exception:
-        pytest.skip("storage is not configured")
+        pytest.skip("boto3 is not installed")
+    except Exception as e:
+        pytest.skip(f"boto3 is not configured {e}")
 
     bucket_name = "dev-cameraready"
     try:
         # Check if bucket exists
-        bucket = client.bucket(bucket_name)
+        s3_client.head_bucket(Bucket=bucket_name)
     except Exception as e:
         pytest.skip(f"Bucket not found {e}")
     # monkeypatch.setattr(PubSubBridge(), "output_bucket", bucket_name)

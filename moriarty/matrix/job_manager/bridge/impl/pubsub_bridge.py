@@ -8,13 +8,14 @@ import json
 import uuid
 from typing import Awaitable
 
-from moriarty.tools import parse_gcs_path
+from moriarty.tools import parse_s3_path
 
 try:
     from functools import cache
 except ImportError:
     from functools import lru_cache as cache
 
+import boto3
 from fastapi.concurrency import run_in_threadpool
 
 from moriarty.log import logger
@@ -32,7 +33,6 @@ from google.api_core.exceptions import (
     InvalidArgument,
 )
 from google.cloud import pubsub_v1
-from google.cloud import storage
 
 
 class PubSubBridge(QueueBridge):
@@ -170,7 +170,7 @@ class PubSubBridge(QueueBridge):
                             continue
 
                         # Construct corresponding subscription path
-                        subscription_id = f"moriarty-bridge-{endpoint_name}-sub-{priority}"
+                        subscription_id = f"moriarty-bridge-{endpoint_name}-{priority}-sub"
                         subscription_path = self.subscriber_client.subscription_path(
                             self.project_id, subscription_id
                         )
@@ -284,11 +284,6 @@ class PubSubBridge(QueueBridge):
         invocation_status = (
             "Completed" if result.status == InferenceResultStatus.COMPLETED else "Failed"
         )
-        # response_body = {
-        #     "content": base64.b64decode(result.payload.encode()).decode(),
-        #     "message": result.message,
-        #     "encoding": "BASE64",
-        # }
         response_body = (
             {
                 "content": base64.b64encode(result.payload.encode()).decode(),
@@ -320,7 +315,7 @@ class PubSubBridge(QueueBridge):
         }
 
         if self.output_bucket:
-            output_location = await self._upload_to_gcs(result.payload)
+            output_location = await self._upload_to_s3(result.payload)
             logger.info(f"payload uploaded to gcs {output_location}")
             message_content["responseParameters"] = {
                 "contentType": "text/plain; charset=utf-8",
@@ -328,9 +323,7 @@ class PubSubBridge(QueueBridge):
             }
 
         data = json.dumps(message_content).encode("utf-8")
-        # data = {"Message": json.dumps(message_content)}
         future = self.publisher_client.publish(self.bridge_result_topic_path, data)
-        # future = self.publisher_client.publish(self.bridge_result_topic_path, json.dumps(data))
         message_id = await asyncio.wrap_future(future)
         logger.debug(f"Result {result.inference_id} published with message ID: {message_id}")
 
@@ -394,9 +387,8 @@ class PubSubBridge(QueueBridge):
                 else:
                     try:
                         payload = base64.b64decode(message_data["responseBody"]["content"]).decode("utf-8")
-                        # payload = message["responseBody"]["content"]
                     except Exception as e:
-                        logger.info(f"Cannot parse inference result {message_data['inferenceId']}, fetching from GCS.")
+                        logger.info(f"Cannot parse inference result {message_data['inferenceId']}, fetching from S3.")
                         output_location = message_data["responseParameters"].get("outputLocation")
                         if not output_location:
                             logger.error(
@@ -407,14 +399,12 @@ class PubSubBridge(QueueBridge):
                             continue
 
                         logger.info(f"output_location: {output_location}")
-                        payload = await self._get_gcs_content(output_location)
+                        payload = await self._get_s3_content(output_location)
 
                     result = InferenceResult(
                         inference_id = message_data["inferenceId"],
                         status=InferenceResultStatus.COMPLETED if message_data["invocationStatus"] == "Completed" else InferenceResultStatus.FAILED,
                         message=message_data["responseBody"]["message"],
-                        # payload=base64.b64decode(message_data["responseBody"]["content"]).decode("utf-8"),
-                        # payload=message_data["responseBody"]["content"],
                         payload=payload,
                     )
                     logger.debug(f"Prepared InferenceResult for inference ID: {result.inference_id}")
@@ -504,20 +494,51 @@ class PubSubBridge(QueueBridge):
             raise ValueError("Invalid subscription path format")
         return parts[1], parts[3]
 
-    async def _upload_to_gcs(self, payload: str) -> str:
-        storage_client = storage.Client()
-        bucket = storage_client.bucket(self.output_bucket)
-        blob_name = f"moriarty-async-inference/output/{uuid.uuid4().hex}.out"
-        blob = bucket.blob(blob_name)
-        blob.upload_from_string(payload)
-        return f"gs://{self.output_bucket}/{blob_name}"
+    # async def _upload_to_gcs(self, payload: str) -> str:
+    #     storage_client = storage.Client()
+    #     bucket = storage_client.bucket(self.output_bucket)
+    #     blob_name = f"moriarty-async-inference/output/{uuid.uuid4().hex}.out"
+    #     blob = bucket.blob(blob_name)
+    #     blob.upload_from_string(payload)
+    #     return f"gs://{self.output_bucket}/{blob_name}"
 
-    async def _get_gcs_content(self, output_location: str) -> str:
-        storage_client = storage.Client()
-        bucket_name, blob_name = parse_gcs_path(output_location)
-        bucket = storage_client.bucket(bucket_name)
-        blob = bucket.blob(blob_name)
-        return blob.download_as_text()
+    # async def _get_gcs_content(self, output_location: str) -> str:
+    #     storage_client = storage.Client()
+    #     bucket_name, blob_name = parse_gcs_path(output_location)
+    #     bucket = storage_client.bucket(bucket_name)
+    #     blob = bucket.blob(blob_name)
+    #     return blob.download_as_text()
+
+    async def _upload_to_s3(self, payload: str | None):
+        if payload is None:
+            return None
+
+        if not payload:
+            payload = ""
+
+        fp = io.BytesIO(payload.encode())
+
+        def _():
+            s3_client = boto3.client("s3")
+            fp.seek(0)
+            key = f"moriarty-async-inference/output/{uuid.uuid4().hex}.out"
+            s3_client.upload_fileobj(
+                Fileobj=fp,
+                Bucket=self.output_bucket,
+                Key=key,
+            )
+            return f"s3://{self.output_bucket}/{key}"
+
+        return await run_in_threadpool(_)
+
+    async def _get_s3_content(self, output_location: str) -> str:
+        def _():
+            s3_resource = boto3.resource("s3")
+            bucket_name, object_name = parse_s3_path(output_location)
+            response = s3_resource.Object(bucket_name, object_name).get()
+            return response["Body"].read().decode("utf-8")
+
+        return await run_in_threadpool(_)
 
     @hookimpl
     def register(manager):
