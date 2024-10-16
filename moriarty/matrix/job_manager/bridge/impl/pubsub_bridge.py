@@ -376,6 +376,7 @@ class PubSubBridge(QueueBridge):
             return 0
 
         tasks = []
+        results = []
         processed_count = 0
         invalid_ack_ids = []
 
@@ -384,47 +385,54 @@ class PubSubBridge(QueueBridge):
             message = received_message.message
             try:
                 message_data = json.loads(message.data.decode("utf-8"))
-
-                if "eventName" in message_data and message_data["eventName"] != "InferenceResult":
-                    logger.warning(f"Unexpected message {message_data}. Message will be ignored.")
-                    invalid_ack_ids.append(ack_id)
-                    continue
-
-                if "invocationStatus" in message_data and message_data["invocationStatus"] == "Failed":
-                    result = InferenceResult(
-                        inference_id=message_data["inferenceId"],
-                        status=InferenceResultStatus.FAILED,
-                        message=message_data["responseBody"]["message"],
-                        payload=message_data["responseBody"]["content"],
-                    )
-                else:
-                    try:
-                        payload = base64.b64decode(message_data["responseBody"]["content"]).decode("utf-8")
-                    except Exception as e:
-                        logger.info(f"Cannot parse inference result {message_data['inferenceId']}, fetching from S3.")
-                        output_location = message_data["responseParameters"].get("outputLocation")
-                        if not output_location:
-                            logger.error(
-                                f"Neither response body parsed nor output location, can't handle now: {message_data}"
-                            )
-                            logger.exception(e)
-                            invalid_ack_ids.append(ack_id)
-                            continue
-
-                        logger.info(f"output_location: {output_location}")
-                        payload = await self._get_s3_content(output_location)
-
-                    result = InferenceResult(
-                        inference_id = message_data["inferenceId"],
-                        status=InferenceResultStatus.COMPLETED if message_data["invocationStatus"] == "Completed" else InferenceResultStatus.FAILED,
-                        message=message_data["responseBody"]["message"],
-                        payload=payload,
-                    )
-                    logger.debug(f"Prepared InferenceResult for inference ID: {result.inference_id}")
             except Exception as e:
                 logger.error(f"Error parsing message {message_data}: {e}")
                 continue
+            if "eventName" in message_data and message_data["eventName"] != "InferenceResult":
+                logger.warning(f"Unexpected message {message_data}. Message will be ignored.")
+                invalid_ack_ids.append(ack_id)
+                continue
 
+            if "invocationStatus" in message_data and message_data["invocationStatus"] == "Failed":
+                results.append(InferenceResult(
+                    inference_id=message_data["inferenceId"],
+                    status=InferenceResultStatus.FAILED,
+                    message=message_data["responseBody"]["message"],
+                    payload=message_data["responseBody"]["content"],
+                ))
+                continue
+            try:
+                logger.debug(f"Result {message['inferenceId']} completed")
+                results.append(InferenceResult(
+                    inference_id=message["inferenceId"],
+                    status=InferenceResultStatus.COMPLETED,
+                    message=message["responseBody"]["message"],
+                    payload=base64.b64decode(message["responseBody"]["content"]).decode("utf-8"),
+                ))
+                continue
+            except Exception as e:
+                logger.info(f"Cannot parse inference result {message_data['inferenceId']}, fetching from S3.")
+                output_location = message_data["responseParameters"].get("outputLocation")
+                if not output_location:
+                    logger.error(
+                        f"Neither response body parsed nor output location, can't handle now: {message_data}"
+                    )
+                    logger.exception(e)
+                    invalid_ack_ids.append(ack_id)
+                    continue
+
+                logger.info(f"output_location: {output_location}")
+
+                results.append(InferenceResult(
+                    inference_id = message_data["inferenceId"],
+                    status=InferenceResultStatus.COMPLETED,
+                    message=message_data["responseBody"]["message"],
+                    payload=await self._get_s3_content(output_location),
+                ))
+                logger.debug(f"Prepared InferenceResult for inference ID: {message_data['inferenceId']}")
+                continue
+
+        for result in results:
             # Create a task for processing and acknowledging the message
             task = asyncio.create_task(
                 self._process_and_ack(
