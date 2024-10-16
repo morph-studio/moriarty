@@ -66,14 +66,27 @@ class PubSubBridge(QueueBridge):
         if not self.project_id:
             raise ValueError("Project ID must be provided or set in the environment variable GOOGLE_CLOUD_PROJECT")
 
-        self.bridge_result_topic_path = self._ensure_topic(
-            topic_path=f"projects/{self.project_id}/topics/{bridge_result_topic}"
-        )
+        self.bridge_result_topic_path, self.bridge_result_subscription_path = self._format_pubsub_paths(self.project_id, bridge_result_topic)
+        
+        self.bridge_result_topic_path = self._ensure_topic(self.bridge_result_topic_path)
         self.bridge_result_subscription_path = self._ensure_subscription(
             topic_path = self.bridge_result_topic_path,
-            subscription_path = f"projects/{self.project_id}/subscriptions/{bridge_result_topic}-sub",
+            subscription_path = self.bridge_result_subscription_path,
         )
 
+    def _format_pubsub_paths(self, project_id, bridge_result_topic):
+        expected_topic_prefix = f"projects/{project_id}/topics/"
+
+        if bridge_result_topic.startswith(expected_topic_prefix):
+            topic_path = bridge_result_topic
+            topic_name = bridge_result_topic[len(expected_topic_prefix):]
+        else:
+            topic_path = f"{expected_topic_prefix}{bridge_result_topic}"
+            topic_name = bridge_result_topic
+
+        subscription_path = f"projects/{project_id}/subscriptions/{topic_name}-sub"
+
+        return topic_path, subscription_path
 
     def _get_topic_prefix(self, endpoint_name: str) -> str:
         return f"moriarty-bridge-{endpoint_name}"
