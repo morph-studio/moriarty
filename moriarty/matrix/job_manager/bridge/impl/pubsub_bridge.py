@@ -49,12 +49,14 @@ class PubSubBridge(QueueBridge):
 
     def __init__(
         self,
-        bridge_result_topic: str = None,
+        bridge_result_queue_url: str = None,
         project_id: str = None,
         *args,
         **kwargs,
     ):
-        super().__init__(bridge_result_topic, *args, **kwargs)
+        super().__init__(bridge_result_queue_url, *args, **kwargs)
+
+        bridge_result_topic = bridge_result_queue_url
 
         self.publisher_client = pubsub_v1.PublisherClient()
         self.subscriber_client = pubsub_v1.SubscriberClient()
@@ -354,7 +356,7 @@ class PubSubBridge(QueueBridge):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             await asyncio.sleep(5)  # Backoff before retrying
-            return 0
+            return []
 
     async def _pull_results_and_execute(
         self,
@@ -367,16 +369,16 @@ class PubSubBridge(QueueBridge):
             request={
                 "subscription": subscription_path,
                 "max_messages": max_messages,
-                "return_immediately": False  # Ensures that pull waits until messages are available
+                # "return_immediately": False  # Ensures that pull waits until messages are available
             }
         )
         received_messages = response.received_messages
         if not response.received_messages:
             logger.info("No messages received.")
-            return 0
+            return []
 
         tasks = []
-        results = []
+        valid_messages = []
         processed_count = 0
         invalid_ack_ids = []
 
@@ -394,24 +396,30 @@ class PubSubBridge(QueueBridge):
                 continue
 
             if "invocationStatus" in message_data and message_data["invocationStatus"] == "Failed":
-                results.append(InferenceResult(
-                    inference_id=message_data["inferenceId"],
-                    status=InferenceResultStatus.FAILED,
-                    message=message_data["responseBody"]["message"],
-                    payload=message_data["responseBody"]["content"],
+                valid_messages.append((
+                    InferenceResult(
+                        inference_id=message_data["inferenceId"],
+                        status=InferenceResultStatus.FAILED,
+                        message=message_data["responseBody"]["message"],
+                        payload=message_data["responseBody"]["content"],
+                    ),
+                    ack_id,
                 ))
                 continue
             try:
-                logger.debug(f"Result {message['inferenceId']} completed")
-                results.append(InferenceResult(
-                    inference_id=message["inferenceId"],
-                    status=InferenceResultStatus.COMPLETED,
-                    message=message["responseBody"]["message"],
-                    payload=base64.b64decode(message["responseBody"]["content"]).decode("utf-8"),
+                logger.debug(f"Result {message_data['inferenceId']} completed")
+                valid_messages.append((
+                    InferenceResult(
+                        inference_id=message["inferenceId"],
+                        status=InferenceResultStatus.COMPLETED,
+                        message=message["responseBody"]["message"],
+                        payload=base64.b64decode(message["responseBody"]["content"]).decode("utf-8"),
+                    ),
+                    ack_id,
                 ))
                 continue
             except Exception as e:
-                logger.info(f"Cannot parse inference result {message_data['inferenceId']}, fetching from S3.")
+                logger.info(f"Cannot parse inference result {message_data}, try output location.")
                 output_location = message_data["responseParameters"].get("outputLocation")
                 if not output_location:
                     logger.error(
@@ -421,29 +429,17 @@ class PubSubBridge(QueueBridge):
                     invalid_ack_ids.append(ack_id)
                     continue
 
-                logger.info(f"output_location: {output_location}")
-
-                results.append(InferenceResult(
-                    inference_id = message_data["inferenceId"],
-                    status=InferenceResultStatus.COMPLETED,
-                    message=message_data["responseBody"]["message"],
-                    payload=await self._get_s3_content(output_location),
+                valid_messages.append((
+                    InferenceResult(
+                        inference_id = message_data["inferenceId"],
+                        status=InferenceResultStatus.COMPLETED,
+                        message=message_data["responseBody"]["message"],
+                        payload=await self._get_s3_content(output_location),
+                    ),
+                    ack_id,
                 ))
-                logger.debug(f"Prepared InferenceResult for inference ID: {message_data['inferenceId']}")
                 continue
-
-        for result in results:
-            # Create a task for processing and acknowledging the message
-            task = asyncio.create_task(
-                self._process_and_ack(
-                    result=result,
-                    subscription_path=subscription_path,
-                    process_func=process_func,
-                    ack_id=ack_id
-                )
-            )
-            tasks.append(task)
-
+            
         if invalid_ack_ids:
             await run_in_threadpool(
                 self.subscriber_client.acknowledge,
@@ -454,11 +450,18 @@ class PubSubBridge(QueueBridge):
             )
             logger.info(f"Acknowledged {len(invalid_ack_ids)} invalid messages")
 
-        if tasks:
-            await asyncio.gather(*tasks)
-            processed_count = len(tasks)
+        processed_inference_ids = []
+        for result, ack_id in valid_messages:
+            processed_id = await self._process_and_ack(
+                result=result,
+                subscription_path=subscription_path,
+                process_func=process_func,
+                ack_id=ack_id
+            )
+            if processed_id is not None:
+                processed_inference_ids.append(processed_id)
 
-        return processed_count
+        return processed_inference_ids
 
     async def _process_and_ack(
         self,
@@ -470,8 +473,7 @@ class PubSubBridge(QueueBridge):
     ):
         try:
             await process_func(result)
-            logger.info(f"Processed message ID: {result.inference_id}")
-
+            logger.info(f"Processed message: {result.inference_id}")
             # Acknowledge the message after successful processing
             await run_in_threadpool(
                 self.subscriber_client.acknowledge,
@@ -480,8 +482,8 @@ class PubSubBridge(QueueBridge):
                     "ack_ids": [ack_id],
                 }
             )
-            logger.info(f"Acknowledged message ID: {result.inference_id}")
-
+            logger.info(f"Acknowledged message: {result.inference_id}")
+            return result.inference_id
         except Exception as e:
             logger.error(f"Error processing message {result.inference_id}: {e}")
 
@@ -502,6 +504,7 @@ class PubSubBridge(QueueBridge):
                 logger.error(f"API error when extending ack deadline for ack_id {ack_id}: {api_error}")
             except Exception as ex:
                 logger.error(f"Unexpected error when extending ack deadline for ack_id {ack_id}: {ex}")
+            return None
 
     def _parse_topic_path(topic_path):
         parts = topic_path.split('/')

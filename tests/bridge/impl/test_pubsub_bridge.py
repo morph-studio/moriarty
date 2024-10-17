@@ -72,7 +72,7 @@ def pubsub_bridge(case_id, endpoint_name, priority, project_id):
         pytest.skip(f"pubsub_v1 is not configured with error: {e}")
 
     bridge = PubSubBridge(
-        bridge_result_topic=result_topic_name,
+        bridge_result_queue_url=result_topic_name,
         project_id=project_id,
     )
     bridge.make_job_queue_url = lambda endpoint_name, priority: job_topic_path
