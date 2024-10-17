@@ -19,13 +19,13 @@ def endpoint_name(case_id):
 def priority():
     return 1
 
-@pytest.fixture(scope="session")
-def gcp_credentials():
-    import os
-    credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if not credentials:
-        pytest.skip("GOOGLE_APPLICATION_CREDENTIALS is not set.")
-    return credentials
+# @pytest.fixture(scope="session")
+# def gcp_credentials():
+#     import os
+#     credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+#     if not credentials:
+#         pytest.skip("GOOGLE_APPLICATION_CREDENTIALS is not set.")
+#     return credentials
 
 @pytest.fixture(scope="session")
 def project_id():
@@ -182,7 +182,7 @@ def result_bucket(pubsub_bridge: PubSubBridge,):
     except Exception as e:
         pytest.skip(f"boto3 is not configured {e}")
 
-    bucket_name = "dev-cameraready"
+    bucket_name = "morgana-example"
     try:
         # Check if bucket exists
         s3_client.head_bucket(Bucket=bucket_name)

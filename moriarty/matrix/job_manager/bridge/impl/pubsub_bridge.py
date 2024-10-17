@@ -407,13 +407,13 @@ class PubSubBridge(QueueBridge):
                 ))
                 continue
             try:
-                logger.debug(f"Result {message_data['inferenceId']} completed")
+                logger.info(f"Result {message_data['inferenceId']} completed")
                 valid_messages.append((
                     InferenceResult(
-                        inference_id=message["inferenceId"],
+                        inference_id=message_data["inferenceId"],
                         status=InferenceResultStatus.COMPLETED,
-                        message=message["responseBody"]["message"],
-                        payload=base64.b64decode(message["responseBody"]["content"]).decode("utf-8"),
+                        message=message_data["responseBody"]["message"],
+                        payload=base64.b64decode(message_data["responseBody"]["content"]).decode("utf-8"),
                     ),
                     ack_id,
                 ))
