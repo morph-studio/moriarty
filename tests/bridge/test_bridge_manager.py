@@ -9,3 +9,6 @@ def test_bridge_manager():
 
     sqs_bridge = manager.init("sqs")
     assert sqs_bridge == manager.init("sqs")
+
+    pubsub_bridge = manager.init("pubsub")
+    assert pubsub_bridge == manager.init("pubsub")
