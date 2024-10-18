@@ -198,6 +198,9 @@ class PubSubBridge(QueueBridge):
                             self.project_id, subscription_id
                         )
 
+                        # Ensure subscription
+                        subscription_path = self._ensure_subscription(topic_path=topic.name, subscription_path=subscription_path)
+
                         try:
                             # Attempt to pull a single message to check for pending messages
                             response = self.subscriber_client.pull(
@@ -525,21 +528,6 @@ class PubSubBridge(QueueBridge):
         if len(parts) != 4 or parts[0] != 'projects' or parts[2] != 'subscriptions':
             raise ValueError("Invalid subscription path format")
         return parts[1], parts[3]
-
-    # async def _upload_to_gcs(self, payload: str) -> str:
-    #     storage_client = storage.Client()
-    #     bucket = storage_client.bucket(self.output_bucket)
-    #     blob_name = f"moriarty-async-inference/output/{uuid.uuid4().hex}.out"
-    #     blob = bucket.blob(blob_name)
-    #     blob.upload_from_string(payload)
-    #     return f"gs://{self.output_bucket}/{blob_name}"
-
-    # async def _get_gcs_content(self, output_location: str) -> str:
-    #     storage_client = storage.Client()
-    #     bucket_name, blob_name = parse_gcs_path(output_location)
-    #     bucket = storage_client.bucket(bucket_name)
-    #     blob = bucket.blob(blob_name)
-    #     return blob.download_as_text()
 
     async def _upload_to_s3(self, payload: str | None):
         if payload is None:
