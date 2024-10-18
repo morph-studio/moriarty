@@ -223,7 +223,7 @@ class PubSubBridge(QueueBridge):
         return await asyncio.to_thread(_)
 
     async def enqueue_job(self, endpoint_name: str, job: InferenceJob, priority: int = None) -> str:
-        topic_path = self._ensure_topic(self._get_topic_path(endpoint_name, priority))
+        topic_path = self._get_topic_path(endpoint_name, priority)
 
         data = job.model_dump_json().encode("utf-8")
         future = self.publisher_client.publish(topic_path, data)
@@ -239,10 +239,7 @@ class PubSubBridge(QueueBridge):
         priority: int = None,
     ) -> int:
         size = size or 1
-        subscription_path = self._ensure_subscription(
-            topic_path=self._get_topic_path(endpoint_name, priority),
-            subscription_path=self._get_subscription_path(endpoint_name, priority),
-        )
+        subscription_path = self._get_subscription_path(endpoint_name, priority)
         logger.info(f"Polling job from subscription: {subscription_path}")
         try:
             return await self._pull_messages_and_execute(process_func, subscription_path, size)
