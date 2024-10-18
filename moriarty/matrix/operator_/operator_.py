@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from moriarty.envs import get_bridge_result_queue_url
+from moriarty.envs import get_bridge_result_queue_url, get_bridge_project_id
 from moriarty.log import logger
 from moriarty.matrix.connector.invoker import get_bridge_name
 from moriarty.matrix.job_manager.bridge_wrapper import BridgeWrapper, get_bridge_wrapper
@@ -48,6 +48,7 @@ def get_bridger(
     redis_client: redis.Redis | redis.RedisCluster = Depends(get_redis_client),
     session: AsyncSession = Depends(get_db_session),
     bridge_result_queue_url: str = Depends(get_bridge_result_queue_url),
+    project_id: str = Depends(get_bridge_project_id),
 ) -> Bridger:
     return Bridger(
         spawner=spawner,
@@ -56,6 +57,7 @@ def get_bridger(
         redis_client=redis_client,
         session=session,
         bridge_result_queue_url=bridge_result_queue_url,
+        project_id=project_id
     )
 
 
@@ -84,6 +86,7 @@ class Bridger(EndpointMixin, AutoscaleMixin):
         redis_client: redis.Redis | redis.RedisCluster,
         session: AsyncSession,
         bridge_result_queue_url: None | str = None,
+        project_id: None | str = None
     ) -> None:
         self.spawner = spawner
         self.bridge_name = bridge_name
@@ -91,6 +94,7 @@ class Bridger(EndpointMixin, AutoscaleMixin):
         self.redis_client = redis_client
         self.session = session
         self.bridge_result_queue_url = bridge_result_queue_url
+        self.project_id = project_id
 
         self.metrics_manager = MetricsManager(
             spawner=spawner,
@@ -162,6 +166,8 @@ class Bridger(EndpointMixin, AutoscaleMixin):
             logger.debug(f"{endpoint_name} has capacity, try to sample job")
             sampled_count = await self.bridge_wrapper.sample_job(
                 bridge=self.bridge_name,
+                bridge_result_queue_url=self.bridge_result_queue_url,
+                project_id=self.project_id,
                 endpoint_name=endpoint_name,
                 process_func=_warp_produce_job,
             )
@@ -173,6 +179,7 @@ class Bridger(EndpointMixin, AutoscaleMixin):
         await self.bridge_wrapper.enqueue_result(
             bridge=self.bridge_name,
             bridge_result_queue_url=self.bridge_result_queue_url,
+            project_id=self.project_id,
             result=InferenceResult.from_proxy_callback(callback),
         )
 

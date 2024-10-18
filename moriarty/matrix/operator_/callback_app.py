@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
-from moriarty.envs import get_bridge_name, get_bridge_result_queue_url, get_spawner_name
+from moriarty.envs import get_bridge_name, get_bridge_result_queue_url, get_spawner_name, get_bridge_project_id
 from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge_wrapper import (
     get_bridge_manager,
@@ -37,6 +37,9 @@ async def lifespan(app: FastAPI):
     get_bridge_result_queue_url_dep = app.dependency_overrides.get(
         get_bridge_result_queue_url, get_bridge_result_queue_url
     )
+    get_bridge_project_id_dep = app.dependency_overrides.get(
+        get_bridge_project_id, get_bridge_project_id
+    )
     get_callback_consumer_dep = app.dependency_overrides.get(
         get_callback_consumer, get_callback_consumer
     )
@@ -51,6 +54,7 @@ async def lifespan(app: FastAPI):
                 redis_client=redis_client,
                 session=session,
                 bridge_result_queue_url=get_bridge_result_queue_url_dep(),
+                project_id=get_bridge_project_id_dep()
             )
 
             c: CallbackManager = get_callback_consumer_dep(

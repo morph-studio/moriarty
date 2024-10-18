@@ -11,6 +11,8 @@ from moriarty.envs import (
     MORIARTY_AUTOSCALER_INTERVAL_ENV,
     MORIARTY_BRIDGE_INTERVAL_ENV,
     get_bridge_name,
+    get_bridge_project_id,
+    get_bridge_result_queue_url
 )
 from moriarty.log import logger
 from moriarty.matrix.job_manager.bridge_wrapper import (
@@ -168,5 +170,7 @@ class BridgeDaemon(DaemonMixin):
                     bridge_wrapper=self.bridge_wrapper,
                     redis_client=redis_client,
                     session=session,
+                    bridge_result_queue_url=get_bridge_result_queue_url(),
+                    project_id=get_bridge_project_id(),
                 )
                 await bridger.bridge_all()

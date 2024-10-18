@@ -117,8 +117,12 @@ class PubSubBridge(QueueBridge):
             self.publisher_client.get_topic(request={"topic": topic_path})
             logger.info(f"Topic already exists: {topic_path}")
         except NotFound:
-            topic = self.publisher_client.create_topic(request={"name": topic_path})
-            logger.info(f"Created topic: {topic.name}")
+            try:
+                topic = self.publisher_client.create_topic(request={"name": topic_path})
+                logger.info(f"Created topic: {topic.name}")
+            except AlreadyExists:
+                self.publisher_client.get_topic(request={"topic": topic_path})
+                logger.info(f"Topic already exists: {topic_path}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
         return topic_path
@@ -129,8 +133,12 @@ class PubSubBridge(QueueBridge):
             self.subscriber_client.get_subscription(request={"subscription": subscription_path})
             logger.info(f"Subscription already exists: {subscription_path}")
         except NotFound:
-            subscription = self.subscriber_client.create_subscription(request={"name": subscription_path, "topic": topic_path})
-            logger.info(f"Created subscription: {subscription.name}")
+            try:
+                subscription = self.subscriber_client.create_subscription(request={"name": subscription_path, "topic": topic_path})
+                logger.info(f"Created subscription: {subscription.name}")
+            except AlreadyExists:
+                self.subscriber_client.get_subscription(request={"subscription": subscription_path})
+                logger.info(f"Subscription already exists: {subscription_path}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
         return subscription_path
