@@ -564,6 +564,6 @@ class PubSubBridge(QueueBridge):
 
         return await run_in_threadpool(_)
 
-    @hookimpl
-    def register(manager):
-        manager.register(PubSubBridge)
+@hookimpl
+def register(manager):
+    manager.register(PubSubBridge)
